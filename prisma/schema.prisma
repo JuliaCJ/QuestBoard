@@ -1,0 +1,73 @@
+generator client { provider = "prisma-client-js" }
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  username      String        @unique
+  passwordHash  String
+  role          String        @default("player") // admin | player
+  displayName   String
+  hasPriority   Boolean       @default(false)
+  priorityUntil DateTime?     // set when a priority key is redeemed
+  renown        Int           @default(0)       // cached sum of Ledger
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  signups       Signup[]
+  ledger        Ledger[]
+  keys          PriorityKey[]
+}
+
+model Quest {
+  id               String   @id @default(cuid())
+  title            String
+  level            Int      @default(1)
+  description      String   @default("")
+  renownReward     Int      @default(0)
+  oneShotDate      DateTime
+  minPlayers       Int      @default(3)
+  maxPlayers       Int      @default(6)
+  postAt           DateTime
+  prioritySignupAt DateTime
+  generalSignupAt  DateTime
+  manualLock       Boolean  @default(false)
+  status           String   @default("active") // active | postponed | completed | cancelled
+  createdAt        DateTime @default(now())
+  signups          Signup[]
+}
+
+model Signup {
+  id        String   @id @default(cuid())
+  questId   String
+  userId    String
+  className String   @default("Undecided")
+  status    String   @default("signed_up") // signed_up | withdrawn | completed | no_show
+  createdAt DateTime @default(now())
+  quest     Quest    @relation(fields: [questId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  @@unique([questId, userId])
+}
+
+model PriorityKey {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  redeemedById String?
+  redeemedAt   DateTime?
+  redeemedBy   User?     @relation(fields: [redeemedById], references: [id])
+}
+
+model Ledger {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  reason    String   // quest | bonus | first_quest | admin_adjust | (later: purchase, achievement)
+  note      String?
+  questId   String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}

@@ -6,10 +6,11 @@ import { db } from "@/lib/db";
 import { CLASSES, fmt } from "@/lib/util";
 import * as A from "@/app/actions";
 
-export default async function AdminQuest({ params }: { params: { id: string } }) {
+export default async function AdminQuest({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   await requireAdmin();
   const q = await db.quest.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { signups: { where: { status: { not: "withdrawn" } }, include: { user: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!q) notFound();

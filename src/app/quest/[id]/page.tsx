@@ -3,8 +3,9 @@ import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { CLASSES, TZ, doorState, fmt } from "@/lib/util";
 import * as A from "@/app/actions";
+import SignupDates from "@/components/SignupDates";
+import { CLASSES, PRIORITY_WINDOW_DAYS, TZ, doorState, fmt } from "@/lib/util";
 
 // Formats a date for <input type="datetime-local"> in the SITE time zone,
 // which is what zonedToUtc() in the update action expects.
@@ -117,9 +118,10 @@ export default async function QuestPortalDetails({
             <h1>Quest Details</h1>
 
             <p>
-              <strong>Status:</strong> {q.status}
+              <strong>Status:</strong>{" "}
+<span style={{ textTransform: "capitalize" }}>{q.status}</span>
               {q.manualLock ? " (locked)" : ""}
-              {" "}· <strong>Signed up:</strong> {signedUpCount}/{q.maxPlayers}
+              {" "}· <strong>Signed Up:</strong> {signedUpCount}/{q.maxPlayers}
             </p>
 
             <ActionForm key={formKey} action={A.updateQuest} className="stack">
@@ -186,30 +188,16 @@ export default async function QuestPortalDetails({
                   />
                 </label>
 
-                <label>
-                  Priority sign-up opens
-                  <input
-                    name="priority"
-                    type="datetime-local"
-                    defaultValue={toSiteInput(q.prioritySignupAt)}
-                    required
-                  />
-                </label>
+                <SignupDates
+                priority={toSiteInput(q.prioritySignupAt)}
+                general={toSiteInput(q.generalSignupAt)}
+                days={PRIORITY_WINDOW_DAYS}
+/>
 
                 <label>
-                  General sign-up opens
+                  Post At
                   <input
-                    name="general"
-                    type="datetime-local"
-                    defaultValue={toSiteInput(q.generalSignupAt)}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Post at
-                  <input
-                    name="post"
+                    name="psost"
                     type="datetime-local"
                     defaultValue={toSiteInput(q.postAt)}
                     required
@@ -235,7 +223,8 @@ export default async function QuestPortalDetails({
             <h1>{q.title}</h1>
 
             <p>
-              <strong>Status:</strong> {q.status}
+              <strong>Status:</strong>{" "}
+<span style={{ textTransform: "capitalize" }}>{q.status}</span>
               {q.manualLock ? " (locked)" : ""}
             </p>
 
@@ -249,7 +238,7 @@ export default async function QuestPortalDetails({
             </p>
 
             <p>
-              <strong>Player limits:</strong> {q.minPlayers}–{q.maxPlayers}
+              <strong>Player Limits:</strong> {q.minPlayers}–{q.maxPlayers}
             </p>
 
             <p>
@@ -257,11 +246,11 @@ export default async function QuestPortalDetails({
             </p>
 
             <p>
-              <strong>Priority sign-up opens:</strong> {fmt(q.prioritySignupAt)}
+              <strong>Priority Sign-Up Opens:</strong> {fmt(q.prioritySignupAt)}
             </p>
 
             <p>
-              <strong>General sign-up opens:</strong> {fmt(q.generalSignupAt)}
+              <strong>General Sign-Up Opens:</strong> {fmt(q.generalSignupAt)}
             </p>
 
             <h2>Description</h2>
@@ -287,7 +276,7 @@ export default async function QuestPortalDetails({
       <article className="panel">
         <h2>
           {isPast || isAdmin ? "Player History" : "Party"} ({signedUpCount} of{" "}
-          {q.maxPlayers} signed up)
+          {q.maxPlayers} Signed Up)
         </h2>
 
         {q.signups.length === 0 ? (
@@ -378,7 +367,7 @@ export default async function QuestPortalDetails({
               </div>
             ))}
 
-            <button>Complete and pay out Renown</button>
+            <button>Complete and Pay Out Renown</button>
           </ActionForm>
         </article>
       )}
@@ -388,18 +377,27 @@ export default async function QuestPortalDetails({
         <article className="panel">
           <h2>Roster Management</h2>
 
-          <h3>Add a player</h3>
-          <p>
-            Adding a player here skips the sign-up window and the player cap.
-          </p>
+          <h3>
+            Current Roster ({roster.length} of {q.maxPlayers})
+          </h3>
 
-          {availablePlayers.length === 0 ? (
-            <p>Every active player is already on the roster.</p>
-          ) : (
+          {roster.length === 0 && <p>No one is on the roster yet.</p>}
+
+          {roster.map((s) => (
+            <ActionForm key={s.id} action={A.removeFromQuest} className="row">
+              <span>
+                <strong>{s.user.displayName}</strong>, {s.className}
+              </span>
+              <input type="hidden" name="signupId" value={s.id} />
+              <button>Remove</button>
+            </ActionForm>
+          ))}
+
+          <h3> Add a Player</h3>
             <ActionForm action={A.addToQuest} className="inline">
               <input type="hidden" name="questId" value={q.id} />
 
-              <select name="userId" aria-label="Player to add" required>
+              <select name="userId" aria-label="Player" required>
                 {availablePlayers.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.displayName}
@@ -415,25 +413,9 @@ export default async function QuestPortalDetails({
                 ))}
               </select>
 
-              <button>Add player</button>
+              <button>Add</button>
             </ActionForm>
-          )}
-
-          <h3>
-            Current roster ({roster.length} of {q.maxPlayers})
-          </h3>
-
-          {roster.length === 0 && <p>No one is on the roster yet.</p>}
-
-          {roster.map((s) => (
-            <ActionForm key={s.id} action={A.removeFromQuest} className="row">
-              <span>
-                <strong>{s.user.displayName}</strong>, {s.className}
-              </span>
-              <input type="hidden" name="signupId" value={s.id} />
-              <button>Remove</button>
-            </ActionForm>
-          ))}
+          )
         </article>
       )}
     </>

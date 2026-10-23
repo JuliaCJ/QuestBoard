@@ -27,9 +27,9 @@ const pastQuests = quests.filter(
   return (
     <>
       <article className="panel">
-        <title>Admin</title>
-        </article>
-        
+        <h1>Player Portal</h1>
+      </article>
+
       <article className="panel">
         <h2>Players</h2>
         {players.length === 0 && <p>No players yet.</p>}

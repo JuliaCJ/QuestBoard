@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
 import { requireUser } from "@/lib/auth";
@@ -62,12 +61,6 @@ export default async function QuestPortal() {
       <article className="panel">
         <h1>Quest Portal</h1>
         <p>Browse quests, manage schedules, and review past adventures.</p>
-
-        {isAdmin && (
-          <p>
-            <Link href="/admin">Back to Admin</Link>
-          </p>
-        )}
       </article>
 
       <article className="panel">
@@ -80,10 +73,10 @@ export default async function QuestPortal() {
         {currentQuests.map((q) => (
           <div className="row" key={q.id}>
             <span>
-              <Link href={`/quest/${q.id}`}>
+              <Link href={`/quests/${q.id}`}>
                 <strong>{q.title}</strong>
               </Link>
-              {" "}· {q.status}
+              {" "}· <span className="cap">{q.status}</span>
               {q.manualLock ? " (locked)" : ""}
               {" "}· {fmt(q.oneShotDate)}
               {" "}· {q._count.signups}/{q.maxPlayers}
@@ -178,10 +171,10 @@ export default async function QuestPortal() {
           {pastQuests.map((q) => (
             <div className="row" key={q.id}>
               <span>
-                <Link href={`/quest/${q.id}`}>
+                <Link href={`/quests/${q.id}`}>
                   <strong>{q.title}</strong>
                 </Link>
-                {" "}· {q.status}
+                {" "}· <span className="cap">{q.status}</span>
                 {" "}· {fmt(q.oneShotDate)}
                 {" "}· {q._count.signups}/{q.maxPlayers}
               </span>

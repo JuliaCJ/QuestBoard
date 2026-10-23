@@ -51,7 +51,7 @@ export default async function AdminQuest({
 
   return (
     <article className="panel">
-      <Link href="/admin">← Back to admin</Link>
+      <Link href="/admin">← Back to Admin</Link>
 
       <h1>{q.title}</h1>
 
@@ -61,15 +61,15 @@ export default async function AdminQuest({
       </p>
 
       <p>
-        <strong>One-shot date:</strong> {fmt(q.oneShotDate)}
+        <strong>One-Shot Date:</strong> {fmt(q.oneShotDate)}
       </p>
 
       <p>
-        <strong>Players signed up:</strong> {roster.length}/{q.maxPlayers}
+        <strong>Players Signed Up:</strong> {roster.length}/{q.maxPlayers}
       </p>
 
       <p>
-        <strong>Renown reward:</strong> {q.renownReward} Renown
+        <strong>Renown Reward:</strong> {q.renownReward} Renown
       </p>
 
       <h2>Quest Details</h2>

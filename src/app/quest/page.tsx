@@ -157,7 +157,7 @@ export default async function QuestPortal() {
 
                 <ActionForm action={A.cancelQuest} className="inline">
                   <input type="hidden" name="questId" value={q.id} />
-                  <button>Delete permanently</button>
+                  <button>Delete Permanently</button>
                 </ActionForm>
               </span>
             )}
@@ -192,7 +192,7 @@ export default async function QuestPortal() {
                   className="inline"
                 >
                   <input type="hidden" name="questId" value={q.id} />
-                  <button>Delete permanently</button>
+                  <button>Delete Permanently</button>
                 </ActionForm>
               </span>
             </div>
@@ -227,7 +227,7 @@ export default async function QuestPortal() {
               </label>
 
               <label>
-                Renown reward
+                Renown Reward
                 <input
                   name="renown"
                   type="number"
@@ -237,7 +237,7 @@ export default async function QuestPortal() {
               </label>
 
               <label>
-                Min players
+                Min Players
                 <input
                   name="min"
                   type="number"
@@ -247,7 +247,7 @@ export default async function QuestPortal() {
               </label>
 
               <label>
-                Max players
+                Max Players
                 <input
                   name="max"
                   type="number"
@@ -259,7 +259,7 @@ export default async function QuestPortal() {
 
             <div className="grid2">
               <label>
-                Priority sign-up opens
+                Priority Sign-Up Opens
                 <input
                   name="priority"
                   type="datetime-local"
@@ -269,7 +269,7 @@ export default async function QuestPortal() {
               </label>
 
               <label>
-                General sign-up opens
+                General Sign-Up Opens
                 <input
                   name="general"
                   type="datetime-local"
@@ -279,7 +279,7 @@ export default async function QuestPortal() {
               </label>
 
               <label>
-                One-shot date
+                One-Shot Date
                 <input
                   name="oneShot"
                   type="datetime-local"
@@ -289,7 +289,7 @@ export default async function QuestPortal() {
               </label>
 
               <label>
-                Post at
+                Post At
                 <input
                   name="post"
                   type="datetime-local"

@@ -27,12 +27,9 @@ const pastQuests = quests.filter(
   return (
     <>
       <article className="panel">
-        <h1>Admin</h1>
-          <p>
-          <Link href="/quest">Open Quest Portal</Link>
-          </p>
-          </article>
-
+        <title>Admin</title>
+        </article>
+        
       <article className="panel">
         <h2>Players</h2>
         {players.length === 0 && <p>No players yet.</p>}
@@ -74,6 +71,7 @@ const pastQuests = quests.filter(
       </article>
 
       <article className="panel">
+ 
   <h2>Add Player</h2>
   <ActionForm action={A.createPlayer} className="stack">
     <label>Display Name<input name="displayName" required /></label>

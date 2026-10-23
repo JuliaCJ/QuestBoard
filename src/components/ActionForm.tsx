@@ -1,9 +1,9 @@
 "use client";
-import { useFormState } from "react-dom";
+import { useActionState } from "react"
 
 type Action = (fd: FormData) => Promise<string | void>;
 export default function ActionForm({ action, className, children }: { action: Action; className?: string; children: React.ReactNode }) {
-  const [msg, run] = useFormState(async (_: string, fd: FormData) => (await action(fd)) ?? "", "");
+  const [msg, run] = useActionState(async (_: string, fd: FormData) => (await action(fd)) ?? "", "");
   return (
     <form action={run} className={className}>
       {children}

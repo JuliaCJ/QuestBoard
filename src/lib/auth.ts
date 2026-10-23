@@ -8,11 +8,11 @@ const key = () => new TextEncoder().encode(process.env.AUTH_SECRET!);
 
 export async function startSession(userId: string) {
   const jwt = await new SignJWT({}).setProtectedHeader({ alg: "HS256" }).setSubject(userId).setExpirationTime("14d").sign(key());
-  cookies().set(COOKIE, jwt, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 14 * 86400 });
+  (await cookies()).set(COOKIE, jwt, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 14 * 86400 });
 }
 
 export async function currentUser() {
-  const t = cookies().get(COOKIE)?.value;
+  const t = await (await cookies()).get(COOKIE)?.value;
   if (!t) return null;
   try {
     const { payload } = await jwtVerify(t, key());

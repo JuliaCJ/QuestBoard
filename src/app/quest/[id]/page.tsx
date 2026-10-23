@@ -6,11 +6,12 @@ import { db } from "@/lib/db";
 import { CLASSES, doorState, fmt } from "@/lib/util";
 import { signUp, withdraw } from "@/app/actions";
 
-export default async function QuestPage({ params }: { params: { id: string } }) {
+export default async function QuestPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const u = await requireUser();
   const now = new Date();
   const q = await db.quest.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { signups: { where: { status: { in: ["signed_up", "completed"] } }, include: { user: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!q || q.status === "cancelled" || (q.postAt > now && u.role !== "admin")) notFound();

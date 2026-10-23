@@ -29,7 +29,7 @@ export async function login(fd: FormData): R {
   await startSession(u.id);
   redirect("/");
 }
-export async function logout() { cookies().delete(COOKIE); redirect("/login"); }
+export async function logout() { await (await cookies()).delete(COOKIE); redirect("/login"); }
 
 /* ---------- player ---------- */
 export async function signUp(fd: FormData): R {

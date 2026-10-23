@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   try {
     await jwtVerify(req.cookies.get("qb_session")?.value ?? "", new TextEncoder().encode(process.env.AUTH_SECRET!));
     return NextResponse.next();

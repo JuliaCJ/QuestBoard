@@ -288,6 +288,42 @@ export async function reactivateQuest(fd: FormData): R {
   return done("Quest reactivated with the new dates.");
 }
 
+
+export async function deletePastQuest(fd: FormData): R {
+  await requireAdmin();
+
+  const questId = s(fd, "questId");
+
+  const msg = await db.$transaction(async (tx) => {
+    const q = await tx.quest.findUnique({
+      where: { id: questId },
+    });
+
+    if (!q || !["completed", "cancelled"].includes(q.status)) {
+      return "Only completed or cancelled quests can be permanently deleted.";
+    }
+
+    // Preserve Renown history and player balances.
+    await tx.ledger.updateMany({
+      where: { questId },
+      data: { questId: null },
+    });
+
+    // Remove sign-up records associated with this archived quest.
+    await tx.signup.deleteMany({
+      where: { questId },
+    });
+
+    await tx.quest.delete({
+      where: { id: questId },
+    });
+
+    return `Deleted "${q.title}" permanently.`;
+  });
+
+  return done(msg);
+}
+
 export async function cancelQuest(fd: FormData): R {
   await requireAdmin();
 

@@ -15,6 +15,13 @@ export default async function Admin() {
     db.user.findMany({ where: { role: "player", isActive: true }, orderBy: { displayName: "asc" } }),
     db.priorityKey.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { redeemedBy: true } }),
   ]);
+  const currentQuests = quests.filter(
+  (q) => q.status === "active" || q.status === "postponed"
+);
+
+const pastQuests = quests.filter(
+  (q) => q.status === "cancelled" || q.status === "completed"
+);
   const now = new Date();
 
   return (
@@ -23,57 +30,107 @@ export default async function Admin() {
         <h1>Admin</h1>
 
         <h2>Quests</h2>
-        {quests.length === 0 && <p>No quests yet.</p>}
-        {quests.map((q) => (
-          <div className="row" key={q.id}>
-            <span>
-              <Link href={`/admin/quest/${q.id}`}><strong>{q.title}</strong></Link>
-              {" "}· {q.status}{q.manualLock ? " (locked)" : ""} · {fmt(q.oneShotDate)} · {q._count.signups}/{q.maxPlayers}
-            </span>
-            <span className="inline">
-  <ActionForm action={A.setLock} className="inline">
-    <input type="hidden" name="questId" value={q.id} />
-    <input
-      type="hidden"
-      name="value"
-      value={q.manualLock ? "0" : "1"}
-    />
-    <button>{q.manualLock ? "Unlock" : "Lock"}</button>
-  </ActionForm>
+    {currentQuests.length === 0 && <p>No active or deferred quests.</p>}
 
-  <ActionForm action={A.rescheduleQuest} className="inline">
-    <input type="hidden" name="questId" value={q.id} />
-    <input
-      name="oneShot"
-      type="datetime-local"
-      aria-label="New one-shot date"
-      required
-    />
-    <button>Reschedule</button>
-  </ActionForm>
+    {currentQuests.map((q) => (
+      <div className="row" key={q.id}>
+        <span>
+          <Link href={`/admin/quest/${q.id}`}>
+            <strong>{q.title}</strong>
+          </Link>
+          {" "}· {q.status}
+          {q.manualLock ? " (locked)" : ""}
+          {" "}· {fmt(q.oneShotDate)}
+          {" "}· {q._count.signups}/{q.maxPlayers}
+        </span>
 
-  {q.status === "active" && (
-    <ActionForm action={A.deferQuest} className="inline">
-      <input type="hidden" name="questId" value={q.id} />
-      <button>Defer</button>
-    </ActionForm>
-  )}
+        <span className="inline">
+          {q.status === "active" && (
+            <>
+              <ActionForm action={A.setLock} className="inline">
+                <input type="hidden" name="questId" value={q.id} />
+                <input
+                  type="hidden"
+                  name="value"
+                  value={q.manualLock ? "0" : "1"}
+                />
+                <button>{q.manualLock ? "Unlock" : "Lock"}</button>
+              </ActionForm>
 
-  {q.status === "postponed" && (
-    <ActionForm action={A.reactivateQuest} className="inline">
-      <input type="hidden" name="questId" value={q.id} />
-      <button>Reactivate</button>
-    </ActionForm>
-  )}
+              <ActionForm action={A.deferQuest} className="inline">
+                <input type="hidden" name="questId" value={q.id} />
+                <button>Defer</button>
+              </ActionForm>
+            </>
+          )}
 
-  <ActionForm action={A.cancelQuest} className="inline">
-    <input type="hidden" name="questId" value={q.id} />
-    <button>Delete permanently</button>
-  </ActionForm>
-</span>
-          </div>
-        ))}
-      </article>
+          <ActionForm action={A.rescheduleQuest} className="inline">
+            <input type="hidden" name="questId" value={q.id} />
+            <input
+              name="oneShot"
+              type="datetime-local"
+              aria-label="New one-shot date"
+              defaultValue={q.oneShotDate.toISOString().slice(0, 16)}
+              required
+            />
+            <button>Reschedule</button>
+          </ActionForm>
+
+          {q.status === "postponed" && (
+            <ActionForm action={A.reactivateQuest} className="inline">
+              <input type="hidden" name="questId" value={q.id} />
+              <input
+                type="hidden"
+                name="oneShot"
+                value={q.oneShotDate.toISOString().slice(0, 16)}
+              />
+              <input
+                type="hidden"
+                name="priority"
+                value={q.prioritySignupAt.toISOString().slice(0, 16)}
+              />
+              <input
+                type="hidden"
+                name="general"
+                value={q.generalSignupAt.toISOString().slice(0, 16)}
+              />
+              <input
+                type="hidden"
+                name="post"
+                value={q.postAt.toISOString().slice(0, 16)}
+              />
+              <button>Reactivate</button>
+            </ActionForm>
+          )}
+
+          <ActionForm action={A.cancelQuest} className="inline">
+            <input type="hidden" name="questId" value={q.id} />
+            <button>Delete permanently</button>
+          </ActionForm>
+        </span>
+      </div>
+    ))}
+  </article>
+
+  <article className="panel">
+    <h2>Past Quests</h2>
+    <p>Completed and cancelled quests are archived here.</p>
+
+    {pastQuests.length === 0 && <p>No past quests yet.</p>}
+
+    {pastQuests.map((q) => (
+      <div className="row" key={q.id}>
+        <span>
+          <Link href={`/admin/quest/${q.id}`}>
+            <strong>{q.title}</strong>
+          </Link>
+          {" "}· {q.status}
+          {" "}· {fmt(q.oneShotDate)}
+          {" "}· {q._count.signups}/{q.maxPlayers}
+        </span>
+      </div>
+    ))}
+  </article>
 
       <article className="panel">
         <h2>New Quest</h2>

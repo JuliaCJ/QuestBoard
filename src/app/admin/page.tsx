@@ -1,84 +1,148 @@
-import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import Link from "next/link";
+import ActionForm from "@/components/ActionForm";
+import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { PRIORITY_WINDOW_DAYS, fmt } from "@/lib/util";
+import * as A from "@/app/actions";
 
-export default async function AdminDashboard() {
-  // Server-side authorization check for admin role should be performed here (NFR: server-side auth on every admin route)
+export default async function Admin() {
+  await requireAdmin();
+  const [quests, players, keys] = await Promise.all([
+    db.quest.findMany({
+      orderBy: { oneShotDate: "desc" },
+      include: { _count: { select: { signups: { where: { status: "signed_up" } } } } },
+    }),
+    db.user.findMany({ where: { role: "player", isActive: true }, orderBy: { displayName: "asc" } }),
+    db.priorityKey.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { redeemedBy: true } }),
+  ]);
+  const now = new Date();
 
   return (
-    <main className="min-h-screen bg-neutral-900 text-neutral-100 p-6 md:p-12">
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Admin Portal</h1>
-          <p className="text-neutral-400 mt-1">
-            Central management hub for accounts, quests, the renown store, and achievements.
-          </p>
-        </header>
+    <>
+      <article className="panel">
+        <h1>Admin</h1>
 
-        {/* Admin Menu Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Edit Players */}
-          <Link
-            href="/admin/players"
-            className="p-6 bg-neutral-800 border border-neutral-700 rounded-lg hover:border-amber-500 transition-colors group"
-          >
-            <h2 className="text-xl font-semibold group-hover:text-amber-400 transition-colors">
-              Edit Players
-            </h2>
-            <p className="text-neutral-400 text-sm mt-2">
-              Create player accounts, generate credentials, deactivate accounts, reset passwords, and toggle permanent priority status.
-            </p>
-          </Link>
+        <h2>Quests</h2>
+        {quests.length === 0 && <p>No quests yet.</p>}
+        {quests.map((q) => (
+          <div className="row" key={q.id}>
+            <span>
+              <Link href={`/admin/quest/${q.id}`}><strong>{q.title}</strong></Link>
+              {" "}· {q.status}{q.manualLock ? " (locked)" : ""} · {fmt(q.oneShotDate)} · {q._count.signups}/{q.maxPlayers}
+            </span>
+            {(q.status === "active" || q.status === "postponed") && (
+              <span className="inline">
+                <ActionForm action={A.setLock} className="inline">
+                  <input type="hidden" name="questId" value={q.id} />
+                  <input type="hidden" name="value" value={q.manualLock ? "0" : "1"} />
+                  <button>{q.manualLock ? "Unlock" : "Lock"}</button>
+                </ActionForm>
+                {q.status === "postponed" && (
+                  <ActionForm action={A.unpostpone} className="inline">
+                    <input type="hidden" name="questId" value={q.id} />
+                    <input name="oneShot" type="datetime-local" aria-label="New one-shot date" />
+                    <button>Reactivate</button>
+                  </ActionForm>
+                )}
+                <ActionForm action={A.cancelQuest} className="inline">
+                  <input type="hidden" name="questId" value={q.id} />
+                  <button>Cancel</button>
+                </ActionForm>
+              </span>
+            )}
+          </div>
+        ))}
+      </article>
 
-          {/* Edit Quests */}
-          <Link
-            href="/admin/quests"
-            className="p-6 bg-neutral-800 border border-neutral-700 rounded-lg hover:border-amber-500 transition-colors group"
-          >
-            <h2 className="text-xl font-semibold group-hover:text-amber-400 transition-colors">
-              Edit Quests
-            </h2>
-            <p className="text-neutral-400 text-sm mt-2">
-              Create, edit, cancel, lock, or unlock quests, schedule dates, override player limits, and manage manual sign-ups/rosters[cite: 5].
-            </p>
-          </Link>
+      <article className="panel">
+        <h2>New quest</h2>
+        <ActionForm action={A.createQuest} className="stack">
+          <label>Title<input name="title" required /></label>
+          <label>Description<textarea name="description" rows={3} /></label>
+          <div className="grid2">
+            <label>Level<input name="level" type="number" min={1} defaultValue={1} /></label>
+            <label>Renown reward<input name="renown" type="number" min={0} defaultValue={0} /></label>
+            <label>Min players<input name="min" type="number" min={1} defaultValue={3} /></label>
+            <label>Max players<input name="max" type="number" min={1} defaultValue={6} /></label>
+          </div>
+          <div className="grid2">
+            <label>One-shot date<input name="oneShot" type="datetime-local" required /></label>
+            <label>General sign-up opens<input name="general" type="datetime-local" required /></label>
+            <label>Priority sign-up opens (default {PRIORITY_WINDOW_DAYS} days earlier)<input name="priority" type="datetime-local" /></label>
+            <label>Post at (default now)<input name="post" type="datetime-local" /></label>
+          </div>
+          <button>Create quest</button>
+        </ActionForm>
+      </article>
 
-          {/* Edit Store */}
-          <Link
-            href="/admin/store"
-            className="p-6 bg-neutral-800 border border-neutral-700 rounded-lg hover:border-amber-500 transition-colors group"
-          >
-            <h2 className="text-xl font-semibold group-hover:text-amber-400 transition-colors">
-              Edit Store
-            </h2>
-            <p className="text-neutral-400 text-sm mt-2">
-              Add, edit, or remove items in the Renown Store (consumables and equipables), configure prices, and update stat sheets[cite: 5].
-            </p>
-          </Link>
+      <article className="panel">
+        <h2>Players</h2>
+        {players.length === 0 && <p>No players yet.</p>}
+        {players.map((p) => {
+          const priority = p.hasPriority || (!!p.priorityUntil && p.priorityUntil > now);
+          return (
+            <div className="stack" key={p.id} style={{ borderTop: "1px solid #0002", paddingTop: ".6rem", marginTop: ".6rem" }}>
+              <div className="row" style={{ border: 0, padding: 0 }}>
+                <span>
+                  <strong>{p.displayName}</strong> ({p.username}) · {p.renown} Renown
+                  {priority ? " · priority" : ""}{p.priorityUntil && !p.hasPriority ? ` until ${fmt(p.priorityUntil)}` : ""}
+                </span>
+                <span className="inline">
+                  <ActionForm action={A.setPriority} className="inline">
+                    <input type="hidden" name="userId" value={p.id} />
+                    <input type="hidden" name="value" value={p.hasPriority ? "0" : "1"} />
+                    <button>{p.hasPriority ? "Remove priority" : "Grant priority"}</button>
+                  </ActionForm>
+                  <ActionForm action={A.deactivate} className="inline">
+                    <input type="hidden" name="userId" value={p.id} />
+                    <button>Remove player</button>
+                  </ActionForm>
+                </span>
+              </div>
+              <ActionForm action={A.adjustRenown} className="inline">
+                <input type="hidden" name="userId" value={p.id} />
+                <input name="amount" type="number" placeholder="Renown (+/-)" />
+                <input name="note" placeholder="Note" />
+                <button>Adjust Renown</button>
+              </ActionForm>
+              <ActionForm action={A.resetPassword} className="inline">
+                <input type="hidden" name="userId" value={p.id} />
+                <input name="password" type="text" placeholder="New password" autoComplete="off" />
+                <button>Reset password</button>
+              </ActionForm>
+            </div>
+          );
+        })}
+      </article>
 
-          {/* Edit Achievements */}
-          <Link
-            href="/admin/achievements"
-            className="p-6 bg-neutral-800 border border-neutral-700 rounded-lg hover:border-amber-500 transition-colors group"
-          >
-            <h2 className="text-xl font-semibold group-hover:text-amber-400 transition-colors">
-              Edit Achievements
-            </h2>
-            <p className="text-neutral-400 text-sm mt-2">
-              Create achievements, set public or secret visibility, assign reward renown, and award them manually to players[cite: 5].
-            </p>
-          </Link>
-        </div>
+      <article className="panel">
+        <h2>Add player</h2>
+        <ActionForm action={A.createPlayer} className="stack">
+          <label>Display name<input name="displayName" required /></label>
+          <label>Username<input name="username" required autoComplete="off" /></label>
+          <label>Password<input name="password" type="text" required minLength={8} autoComplete="off" /></label>
+          <button>Create player</button>
+        </ActionForm>
+      </article>
 
-        {/* Navigation Footer */}
-        <div className="mt-8 pt-6 border-t border-neutral-800 flex justify-between items-center">
-          <Link
-            href="/"
-            className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
-          >
-            &larr; Back to Quest Board
-          </Link>
-        </div>
-      </div>
-    </main>
+      <article className="panel">
+        <h2>Priority keys</h2>
+        <ActionForm action={A.createKey} className="inline">
+          <input name="code" placeholder="Key code" autoComplete="off" required />
+          <input name="days" type="number" min={1} defaultValue={5} aria-label="Days valid" />
+          <button>Create key</button>
+        </ActionForm>
+        {keys.map((k) => (
+          <div className="row" key={k.id}>
+            <span><strong>{k.code}</strong></span>
+            <span>
+              {k.redeemedBy
+                ? `redeemed by ${k.redeemedBy.displayName}`
+                : k.expiresAt < now ? "expired" : `valid until ${fmt(k.expiresAt)}`}
+            </span>
+          </div>
+        ))}
+      </article>
+    </>
   );
 }

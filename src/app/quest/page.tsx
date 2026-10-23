@@ -80,7 +80,7 @@ export default async function QuestPortal() {
         {currentQuests.map((q) => (
           <div className="row" key={q.id}>
             <span>
-              <Link href={`/quests/${q.id}`}>
+              <Link href={`/quest/${q.id}`}>
                 <strong>{q.title}</strong>
               </Link>
               {" "}· {q.status}
@@ -169,7 +169,7 @@ export default async function QuestPortal() {
         <article className="panel">
           <h2>Past Quests</h2>
           <p>
-            Completed and cancelled quests are archived here.
+            Completed quests are archived here.
             Open a quest to review its details and player history.
           </p>
 
@@ -178,7 +178,7 @@ export default async function QuestPortal() {
           {pastQuests.map((q) => (
             <div className="row" key={q.id}>
               <span>
-                <Link href={`/quests/${q.id}`}>
+                <Link href={`/quest/${q.id}`}>
                   <strong>{q.title}</strong>
                 </Link>
                 {" "}· {q.status}

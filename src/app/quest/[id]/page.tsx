@@ -81,7 +81,7 @@ export default async function QuestPortalDetails({
   return (
     <>
       <article className="panel">
-        <Link href="/quests">← Back to Quest Portal</Link>
+        <Link href="/quest">← Back to Quest Portal</Link>
 
         <h1>{q.title}</h1>
 

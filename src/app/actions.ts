@@ -76,22 +76,19 @@ export async function redeemKey(fd: FormData): R {
 
 /* ---------- admin: players, renown, keys ---------- */
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/;
-const passwordError = (pw: string) => (pw.length < 8 ? "Password must be at least 8 characters." : "");
 export async function createPlayer(fd: FormData): R {
   await requireAdmin();
   const displayName = s(fd, "displayName"), username = s(fd, "username").toLowerCase(), pw = String(fd.get("password") ?? "");
   const priority = fd.get("priority") === "on";
   if (!displayName) return "Enter a display name.";
   if (!USERNAME_RE.test(username)) return "Username must be 3-24 characters: letters, numbers, dot, dash or underscore.";
-  if (passwordError(pw)) return passwordError(pw);
   if (await db.user.findUnique({ where: { username } })) return "That username is already taken.";
-  await db.user.create({ data: { username, displayName, passwordHash: await bcrypt.hash(pw, 12) } });
+  await db.user.create({ data: { username, displayName, passwordHash: await bcrypt.hash(pw, 12), hasPriority: priority } });
   return done(`Created ${username}. Share the username and password you chose with the player.`);
 }
 export async function resetPassword(fd: FormData): R {
   await requireAdmin();
   const pw = String(fd.get("password") ?? "");
-  if (passwordError(pw)) return passwordError(pw);
   await db.user.update({ where: { id: s(fd, "userId") }, data: { passwordHash: await bcrypt.hash(pw, 12) } });
   return "Password updated. Share the new password with the player.";
 }

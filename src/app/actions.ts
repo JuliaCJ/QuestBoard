@@ -80,6 +80,7 @@ const passwordError = (pw: string) => (pw.length < 8 ? "Password must be at leas
 export async function createPlayer(fd: FormData): R {
   await requireAdmin();
   const displayName = s(fd, "displayName"), username = s(fd, "username").toLowerCase(), pw = String(fd.get("password") ?? "");
+  const priority = fd.get("priority") === "on";
   if (!displayName) return "Enter a display name.";
   if (!USERNAME_RE.test(username)) return "Username must be 3-24 characters: letters, numbers, dot, dash or underscore.";
   if (passwordError(pw)) return passwordError(pw);

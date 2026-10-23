@@ -55,7 +55,7 @@ export default async function Admin() {
       </article>
 
       <article className="panel">
-        <h2>New quest</h2>
+        <h2>New Quest</h2>
         <ActionForm action={A.createQuest} className="stack">
           <label>Title<input name="title" required /></label>
           <label>Description<textarea name="description" rows={3} /></label>
@@ -71,7 +71,7 @@ export default async function Admin() {
             <label>Priority sign-up opens (default {PRIORITY_WINDOW_DAYS} days earlier)<input name="priority" type="datetime-local" /></label>
             <label>Post at (default now)<input name="post" type="datetime-local" /></label>
           </div>
-          <button>Create quest</button>
+          <button>Create Quest</button>
         </ActionForm>
       </article>
 
@@ -116,14 +116,22 @@ export default async function Admin() {
       </article>
 
       <article className="panel">
-        <h2>Add player</h2>
-        <ActionForm action={A.createPlayer} className="stack">
-          <label>Display name<input name="displayName" required /></label>
-          <label>Username<input name="username" required autoComplete="off" /></label>
-          <label>Password<input name="password" type="text" required minLength={8} autoComplete="off" /></label>
-          <button>Create player</button>
-        </ActionForm>
-      </article>
+  <h2>Add Player</h2>
+  <ActionForm action={A.createPlayer} className="stack">
+    <label>Display Name<input name="displayName" required /></label>
+    <label>Username<input name="username" required autoComplete="off" /></label>
+    <label>Password<input name="password" type="text" required minLength={1} autoComplete="off" /></label>
+    
+    {/* Fixed class to className, and removed required so the form can submit unchecked */}
+    <label className="checkbox-label">
+      Priority
+      <input name="priority" type="checkbox" autoComplete="off" className="small-checkbox" />
+    </label>
+
+    <button>Create Player</button>
+  </ActionForm>
+</article>
+
 
       <article className="panel">
         <h2>Priority keys</h2>

@@ -56,23 +56,132 @@ export default async function Admin() {
 
       <article className="panel">
         <h2>New Quest</h2>
-        <ActionForm action={A.createQuest} className="stack">
-          <label>Title<input name="title" required /></label>
-          <label>Description<textarea name="description" rows={3} /></label>
-          <div className="grid2">
-            <label>Level<input name="level" type="number" min={1} defaultValue={1} /></label>
-            <label>Renown reward<input name="renown" type="number" min={0} defaultValue={0} /></label>
-            <label>Min players<input name="min" type="number" min={1} defaultValue={3} /></label>
-            <label>Max players<input name="max" type="number" min={1} defaultValue={6} /></label>
-          </div>
-          <div className="grid2">
-            <label>One-shot date<input name="oneShot" type="datetime-local" required /></label>
-            <label>General sign-up opens<input name="general" type="datetime-local" required /></label>
-            <label>Priority sign-up opens (default {PRIORITY_WINDOW_DAYS} days earlier)<input name="priority" type="datetime-local" /></label>
-            <label>Post at (default now)<input name="post" type="datetime-local" /></label>
-          </div>
-          <button>Create Quest</button>
-        </ActionForm>
+        {(() => {
+          const now = new Date();
+
+          // Next noon; if it is already noon or later, use tomorrow.
+          const priorityDate = new Date(now);
+          priorityDate.setHours(12, 0, 0, 0);
+          if (now >= priorityDate) {
+            priorityDate.setDate(priorityDate.getDate() + 1);
+          }
+
+          const generalDate = new Date(priorityDate);
+          generalDate.setDate(generalDate.getDate() + 5);
+
+          // Default the quest date to one day after general sign-up opens.
+          const oneShotDate = new Date(generalDate);
+          oneShotDate.setDate(oneShotDate.getDate() + 1);
+
+          // Format for datetime-local: YYYY-MM-DDTHH:mm
+          const toLocalInput = (date: Date) => {
+            const pad = (n: number) => String(n).padStart(2, "0");
+            return (
+              `${date.getFullYear()}-${pad(date.getMonth() + 1)}-` +
+              `${pad(date.getDate())}T${pad(date.getHours())}:` +
+              `${pad(date.getMinutes())}`
+            );
+          };
+
+          return (
+            <ActionForm action={A.createQuest} className="stack">
+              <label>
+                Title
+                <input name="title" required />
+              </label>
+
+              <label>
+                Description
+                <textarea name="description" rows={3} />
+              </label>
+
+              <div className="grid2">
+                <label>
+                  Level
+                  <input
+                    name="level"
+                    type="number"
+                    min={1}
+                    defaultValue={1}
+                  />
+                </label>
+
+                <label>
+                  Renown reward
+                  <input
+                    name="renown"
+                    type="number"
+                    min={0}
+                    defaultValue={0}
+                  />
+                </label>
+
+                <label>
+                  Min players
+                  <input
+                    name="min"
+                    type="number"
+                    min={1}
+                    defaultValue={3}
+                  />
+                </label>
+
+                <label>
+                  Max players
+                  <input
+                    name="max"
+                    type="number"
+                    min={1}
+                    defaultValue={6}
+                  />
+                </label>
+              </div>
+
+              <div className="grid2">
+                <label>
+                  Priority sign-up opens
+                  <input
+                    name="priority"
+                    type="datetime-local"
+                    required
+                    defaultValue={toLocalInput(priorityDate)}
+                  />
+                </label>
+
+                <label>
+                  General sign-up opens
+                  <input
+                    name="general"
+                    type="datetime-local"
+                    required
+                    defaultValue={toLocalInput(generalDate)}
+                  />
+                </label>
+
+                <label>
+                  One-shot date
+                  <input
+                    name="oneShot"
+                    type="datetime-local"
+                    required
+                    defaultValue={toLocalInput(oneShotDate)}
+                  />
+                </label>
+
+                <label>
+                  Post at
+                  <input
+                    name="post"
+                    type="datetime-local"
+                    defaultValue={toLocalInput(priorityDate)}
+                  />
+                </label>
+              </div>
+
+              <button>Create Quest</button>
+            </ActionForm>
+          );
+        })()}
       </article>
 
       <article className="panel">

@@ -18,8 +18,10 @@ export default async function Root({ children }: { children: React.ReactNode }) 
       <body className={`${head.variable} ${body.variable}`}>
         {u && (
           <header className="bar">
-            <Link href="/">Quest Board</Link>
-            {u.role === "admin" && <Link href="/admin">Admin</Link>}
+            <Link href="/">Quest Board</Link> { " | "}
+            {u.role === "admin" && <><Link href="/admin">Player Portal</Link>{" | "}</>}
+            {u.role === "admin" && <><Link href="/quest">Quest Portal</Link>{" | "}</>}
+            
             <span className="grow" />
             <b>{u.renown} Renown</b>
             <form action={logout}><button className="link">Log out</button></form>

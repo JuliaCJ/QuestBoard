@@ -1,11 +1,29 @@
-
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { CLASSES, doorState, fmt } from "@/lib/util";
-import { signUp, withdraw } from "@/app/actions";
+import { CLASSES, TZ, doorState, fmt } from "@/lib/util";
+import * as A from "@/app/actions";
+
+// Formats a date for <input type="datetime-local"> in the SITE time zone,
+// which is what zonedToUtc() in the update action expects.
+function toSiteInput(date: Date) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .formatToParts(date)
+      .map((x) => [x.type, x.value])
+  );
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
 
 export default async function QuestPortalDetails({
   params,
@@ -21,9 +39,7 @@ export default async function QuestPortalDetails({
     where: { id },
     include: {
       signups: {
-        where: isAdmin
-          ? {}
-          : { status: { in: ["signed_up", "completed"] } },
+        where: isAdmin ? {} : { status: { in: ["signed_up", "completed"] } },
         include: { user: true },
         orderBy: { createdAt: "asc" },
       },
@@ -32,43 +48,40 @@ export default async function QuestPortalDetails({
 
   if (!q) notFound();
 
-  const isPast =
-    q.status === "completed" || q.status === "cancelled";
+  const isPast = q.status === "completed" || q.status === "cancelled";
 
   // Deferred and past quests are available in the portal to admins only.
-  if (
-    !isAdmin &&
-    (q.status !== "active" || q.postAt > now)
-  ) {
+  if (!isAdmin && (q.status !== "active" || q.postAt > now)) {
     notFound();
   }
 
-  const signedUpCount = q.signups.filter(
-    (s) => s.status === "signed_up"
-  ).length;
+  const signedUpCount = q.signups.filter((s) => s.status === "signed_up").length;
+  const roster = q.signups.filter((s) => s.status === "signed_up");
 
-  const hp =
-    u.hasPriority ||
-    (!!u.priorityUntil && u.priorityUntil > now);
-
+  const hp = u.hasPriority || (!!u.priorityUntil && u.priorityUntil > now);
   const st = doorState(q, signedUpCount, hp, now);
 
-  const mine = q.signups.find(
-    (s) => s.userId === u.id && s.status === "signed_up"
-  );
+  const mine = q.signups.find((s) => s.userId === u.id && s.status === "signed_up");
 
   const canJoin =
-    !isAdmin &&
-    q.status === "active" &&
-    (st === "open" || st === "priority");
+    !isAdmin && q.status === "active" && (st === "open" || st === "priority");
+
+  // Only admins managing a live quest need the player list.
+  const players =
+    isAdmin && !isPast
+      ? await db.user.findMany({
+          where: { role: "player", isActive: true },
+          orderBy: { displayName: "asc" },
+        })
+      : [];
+
+  const rostered = new Set(roster.map((s) => s.userId));
+  const availablePlayers = players.filter((p) => !rostered.has(p.id));
 
   const picker = (
     <label>
       Class
-      <select
-        name="className"
-        defaultValue={mine?.className ?? "Undecided"}
-      >
+      <select name="className" defaultValue={mine?.className ?? "Undecided"}>
         {CLASSES.map((c) => (
           <option key={c} value={c}>
             {c}
@@ -78,69 +91,194 @@ export default async function QuestPortalDetails({
     </label>
   );
 
+  // Remounts the edit form whenever saved values change, so the fields and the
+  // "Cancel changes" reset always return to what is currently saved.
+  const formKey = [
+    q.title,
+    q.description,
+    q.level,
+    q.renownReward,
+    q.minPlayers,
+    q.maxPlayers,
+    q.oneShotDate.getTime(),
+    q.prioritySignupAt.getTime(),
+    q.generalSignupAt.getTime(),
+    q.postAt.getTime(),
+  ].join("|");
+
   return (
     <>
       <article className="panel">
         <Link href="/quest">← Back to Quest Portal</Link>
 
-        <h1>{q.title}</h1>
-
-        <p>
-          <strong>Status:</strong> {q.status}
-          {q.manualLock ? " (locked)" : ""}
-        </p>
-
-        <p>
-          <strong>Level:</strong> {q.level}
-          {" "}· <strong>Reward:</strong> {q.renownReward} Renown
-        </p>
-
-        <p>
-          <strong>One-shot date:</strong> {fmt(q.oneShotDate)}
-        </p>
-
-        <p>
-          <strong>Player limits:</strong> {q.minPlayers}–{q.maxPlayers}
-        </p>
-
-        <p>
-          <strong>Posted:</strong> {fmt(q.postAt)}
-        </p>
-
-        <p>
-          <strong>Priority sign-up opens:</strong>{" "}
-          {fmt(q.prioritySignupAt)}
-        </p>
-
-        <p>
-          <strong>General sign-up opens:</strong>{" "}
-          {fmt(q.generalSignupAt)}
-        </p>
-
-        <h2>Description</h2>
-        <p style={{ whiteSpace: "pre-wrap" }}>
-          {q.description || "No description provided."}
-        </p>
-
-        {isAdmin && (
+        {/* ---------- Admin: live quest, directly editable ---------- */}
+        {isAdmin && !isPast && (
           <>
+            <h1>Quest Details</h1>
+
             <p>
-              <strong>Created:</strong> {fmt(q.createdAt)}
+              <strong>Status:</strong> {q.status}
+              {q.manualLock ? " (locked)" : ""}
+              {" "}· <strong>Signed up:</strong> {signedUpCount}/{q.maxPlayers}
             </p>
 
-            {!isPast && (
-              <p>
-                <Link href={`/admin/quest/${q.id}`}>
-                  Edit and manage this quest
-                </Link>
-              </p>
-            )}
+            <ActionForm key={formKey} action={A.updateQuest} className="stack">
+              <input type="hidden" name="questId" value={q.id} />
 
-            {isPast && (
+              <label>
+                Title
+                <input name="title" defaultValue={q.title} required />
+              </label>
+
+              <label>
+                Description
+                <textarea name="description" rows={4} defaultValue={q.description} />
+              </label>
+
+              <div className="grid2">
+                <label>
+                  Level
+                  <input name="level" type="number" min={1} defaultValue={q.level} required />
+                </label>
+
+                <label>
+                  Renown reward
+                  <input
+                    name="renown"
+                    type="number"
+                    min={0}
+                    defaultValue={q.renownReward}
+                    required
+                  />
+                </label>
+
+                <label>
+                  Min players
+                  <input
+                    name="min"
+                    type="number"
+                    min={1}
+                    defaultValue={q.minPlayers}
+                    required
+                  />
+                </label>
+
+                <label>
+                  Max players
+                  <input
+                    name="max"
+                    type="number"
+                    min={1}
+                    defaultValue={q.maxPlayers}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="grid2">
+                <label>
+                  One-shot date
+                  <input
+                    name="oneShot"
+                    type="datetime-local"
+                    defaultValue={toSiteInput(q.oneShotDate)}
+                    required
+                  />
+                </label>
+
+                <label>
+                  Priority sign-up opens
+                  <input
+                    name="priority"
+                    type="datetime-local"
+                    defaultValue={toSiteInput(q.prioritySignupAt)}
+                    required
+                  />
+                </label>
+
+                <label>
+                  General sign-up opens
+                  <input
+                    name="general"
+                    type="datetime-local"
+                    defaultValue={toSiteInput(q.generalSignupAt)}
+                    required
+                  />
+                </label>
+
+                <label>
+                  Post at
+                  <input
+                    name="post"
+                    type="datetime-local"
+                    defaultValue={toSiteInput(q.postAt)}
+                    required
+                  />
+                </label>
+              </div>
+
               <p>
-                This quest is archived. Its details and player history
-                are read-only.
+                <strong>Created:</strong> {fmt(q.createdAt)}
               </p>
+
+              <div className="inline">
+                <button type="submit">Update Quest</button>
+                <button type="reset">Cancel changes</button>
+              </div>
+            </ActionForm>
+          </>
+        )}
+
+        {/* ---------- Everyone else: read-only details ---------- */}
+        {(!isAdmin || isPast) && (
+          <>
+            <h1>{q.title}</h1>
+
+            <p>
+              <strong>Status:</strong> {q.status}
+              {q.manualLock ? " (locked)" : ""}
+            </p>
+
+            <p>
+              <strong>Level:</strong> {q.level}
+              {" "}· <strong>Reward:</strong> {q.renownReward} Renown
+            </p>
+
+            <p>
+              <strong>One-shot date:</strong> {fmt(q.oneShotDate)}
+            </p>
+
+            <p>
+              <strong>Player limits:</strong> {q.minPlayers}–{q.maxPlayers}
+            </p>
+
+            <p>
+              <strong>Posted:</strong> {fmt(q.postAt)}
+            </p>
+
+            <p>
+              <strong>Priority sign-up opens:</strong> {fmt(q.prioritySignupAt)}
+            </p>
+
+            <p>
+              <strong>General sign-up opens:</strong> {fmt(q.generalSignupAt)}
+            </p>
+
+            <h2>Description</h2>
+            <p style={{ whiteSpace: "pre-wrap" }}>
+              {q.description || "No description provided."}
+            </p>
+
+            {isAdmin && (
+              <>
+                <p>
+                  <strong>Created:</strong> {fmt(q.createdAt)}
+                </p>
+                <p>
+                  This quest is archived. Its details and player history are
+                  read-only.
+                </p>
+              </>
             )}
           </>
         )}
@@ -148,8 +286,8 @@ export default async function QuestPortalDetails({
 
       <article className="panel">
         <h2>
-          {isPast ? "Player History" : "Party"}
-          {" "}({signedUpCount} of {q.maxPlayers} signed up)
+          {isPast || isAdmin ? "Player History" : "Party"} ({signedUpCount} of{" "}
+          {q.maxPlayers} signed up)
         </h2>
 
         {q.signups.length === 0 ? (
@@ -165,42 +303,29 @@ export default async function QuestPortalDetails({
           </ul>
         )}
 
+        {/* ---------- Player sign-up controls ---------- */}
         {!isAdmin && (
           <>
             {q.status === "completed" ? (
               <p className="note">This quest is complete.</p>
             ) : q.status === "postponed" ? (
-              <p className="note">
-                Postponed. Sign-ups are paused.
-              </p>
+              <p className="note">Postponed. Sign-ups are paused.</p>
             ) : mine ? (
               <>
-                <ActionForm action={signUp} className="stack">
-                  <input
-                    type="hidden"
-                    name="questId"
-                    value={q.id}
-                  />
+                <ActionForm action={A.signUp} className="stack">
+                  <input type="hidden" name="questId" value={q.id} />
                   {picker}
                   <button>Change class</button>
                 </ActionForm>
 
-                <ActionForm action={withdraw} className="stack">
-                  <input
-                    type="hidden"
-                    name="questId"
-                    value={q.id}
-                  />
+                <ActionForm action={A.withdraw} className="stack">
+                  <input type="hidden" name="questId" value={q.id} />
                   <button>Withdraw</button>
                 </ActionForm>
               </>
             ) : canJoin ? (
-              <ActionForm action={signUp} className="stack">
-                <input
-                  type="hidden"
-                  name="questId"
-                  value={q.id}
-                />
+              <ActionForm action={A.signUp} className="stack">
+                <input type="hidden" name="questId" value={q.id} />
                 {picker}
                 <button>Sign up</button>
               </ActionForm>
@@ -216,6 +341,101 @@ export default async function QuestPortalDetails({
           </>
         )}
       </article>
+
+      {/* ---------- Admin: complete quest ---------- */}
+      {isAdmin && !isPast && q.status === "active" && (
+        <article className="panel">
+          <ActionForm action={A.completeQuest} className="stack">
+            <input type="hidden" name="questId" value={q.id} />
+
+            <h2>Complete Quest</h2>
+
+            {roster.length === 0 && <p>No one is signed up.</p>}
+
+            {roster.map((s) => (
+              <div className="row" key={s.id}>
+                <span>
+                  {s.user.displayName}, {s.className}
+                </span>
+
+                <label className="inline">
+                  <input
+                    type="checkbox"
+                    name="noshow"
+                    value={s.userId}
+                    style={{ width: 24, minHeight: 24 }}
+                  />
+                  No-show
+                </label>
+
+                <input
+                  name={`bonus_${s.userId}`}
+                  type="number"
+                  min={0}
+                  placeholder="Bonus Renown"
+                  style={{ width: "9rem" }}
+                />
+              </div>
+            ))}
+
+            <button>Complete and pay out Renown</button>
+          </ActionForm>
+        </article>
+      )}
+
+      {/* ---------- Admin: roster management ---------- */}
+      {isAdmin && !isPast && (
+        <article className="panel">
+          <h2>Roster Management</h2>
+
+          <h3>Add a player</h3>
+          <p>
+            Adding a player here skips the sign-up window and the player cap.
+          </p>
+
+          {availablePlayers.length === 0 ? (
+            <p>Every active player is already on the roster.</p>
+          ) : (
+            <ActionForm action={A.addToQuest} className="inline">
+              <input type="hidden" name="questId" value={q.id} />
+
+              <select name="userId" aria-label="Player to add" required>
+                {availablePlayers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.displayName}
+                  </option>
+                ))}
+              </select>
+
+              <select name="className" aria-label="Class">
+                {CLASSES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              <button>Add player</button>
+            </ActionForm>
+          )}
+
+          <h3>
+            Current roster ({roster.length} of {q.maxPlayers})
+          </h3>
+
+          {roster.length === 0 && <p>No one is on the roster yet.</p>}
+
+          {roster.map((s) => (
+            <ActionForm key={s.id} action={A.removeFromQuest} className="row">
+              <span>
+                <strong>{s.user.displayName}</strong>, {s.className}
+              </span>
+              <input type="hidden" name="signupId" value={s.id} />
+              <button>Remove</button>
+            </ActionForm>
+          ))}
+        </article>
+      )}
     </>
   );
 }

@@ -6,6 +6,13 @@ import { db } from "@/lib/db";
 import { CLASSES, fmt } from "@/lib/util";
 import * as A from "@/app/actions";
 
+function toLocalInput(date: Date | null) {
+  if (!date) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
 export default async function AdminQuest({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireAdmin();
@@ -20,6 +27,114 @@ export default async function AdminQuest({ params }: { params: Promise<{ id: str
     <article className="panel">
       <Link href="/admin">Back to admin</Link>
       <h1>{q.title}</h1>
+      <h2>Edit Quest</h2>
+<ActionForm action={A.updateQuest} className="stack">
+  <input type="hidden" name="questId" value={q.id} />
+
+  <label>
+    Title
+    <input name="title" defaultValue={q.title} required />
+  </label>
+
+  <label>
+    Description
+    <textarea
+      name="description"
+      rows={3}
+      defaultValue={q.description ?? ""}
+    />
+  </label>
+
+  <div className="grid2">
+    <label>
+      Level
+      <input
+        name="level"
+        type="number"
+        min={1}
+        defaultValue={q.level}
+        required
+      />
+    </label>
+
+    <label>
+      Renown reward
+      <input
+        name="renown"
+        type="number"
+        min={0}
+        defaultValue={q.renownReward}
+        required
+      />
+    </label>
+
+    <label>
+      Min players
+      <input
+        name="min"
+        type="number"
+        min={1}
+        defaultValue={q.minPlayers}
+        required
+      />
+    </label>
+
+    <label>
+      Max players
+      <input
+        name="max"
+        type="number"
+        min={1}
+        defaultValue={q.maxPlayers}
+        required
+      />
+    </label>
+  </div>
+
+  <div className="grid2">
+    <label>
+      One-shot date
+      <input
+        name="oneShot"
+        type="datetime-local"
+        defaultValue={toLocalInput(q.oneShotDate)}
+        required
+      />
+    </label>
+
+    <label>
+      Priority sign-up opens
+      <input
+        name="priority"
+        type="datetime-local"
+        defaultValue={toLocalInput(q.prioritySignupAt)}
+        required
+      />
+    </label>
+
+    <label>
+      General sign-up opens
+      <input
+        name="general"
+        type="datetime-local"
+        defaultValue={toLocalInput(q.generalSignupAt)}
+        required
+      />
+    </label>
+
+    <label>
+      Post at
+      <input
+        name="post"
+        type="datetime-local"
+        defaultValue={toLocalInput(q.postAt)}
+        required
+      />
+    </label>
+  </div>
+
+  <button>Update Quest</button>
+</ActionForm>
       <p>{q.status} · {fmt(q.oneShotDate)} · {roster.length}/{q.maxPlayers} signed up · reward {q.renownReward} Renown</p>
 
       {q.status === "active" ? (

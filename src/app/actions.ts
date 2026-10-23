@@ -127,28 +127,272 @@ export async function createKey(fd: FormData): R {
 /* ---------- admin: quests ---------- */
 export async function createQuest(fd: FormData): R {
   await requireAdmin();
-  const n = (k: string, d: number) => parseInt(s(fd, k), 10) || d;
-  if (!s(fd, "title") || !s(fd, "general") || !s(fd, "oneShot")) return "Title, general sign-up date and one-shot date are required.";
-  const general = zonedToUtc(s(fd, "general"));
-  const q = await db.quest.create({ data: {
-    title: s(fd, "title"), level: n("level", 1), description: s(fd, "description"), renownReward: n("renown", 0),
-    oneShotDate: zonedToUtc(s(fd, "oneShot")), generalSignupAt: general,
-    prioritySignupAt: s(fd, "priority") ? zonedToUtc(s(fd, "priority")) : new Date(general.getTime() - PRIORITY_WINDOW_DAYS * DAY),
-    postAt: s(fd, "post") ? zonedToUtc(s(fd, "post")) : new Date(),
-    minPlayers: n("min", 3), maxPlayers: n("max", 6),
-  } });
+
+  const n = (k: string, d: number) => {
+    const raw = s(fd, k);
+    return raw === "" ? d : Number(raw);
+  };
+
+  const title = s(fd, "title");
+  if (!title || !s(fd, "oneShot") || !s(fd, "general") || !s(fd, "priority")) {
+    return "Title and all quest dates are required.";
+  }
+
+  const oneShotDate = zonedToUtc(s(fd, "oneShot"));
+  const prioritySignupAt = zonedToUtc(s(fd, "priority"));
+  const generalSignupAt = zonedToUtc(s(fd, "general"));
+  const postAt = s(fd, "post") ? zonedToUtc(s(fd, "post")) : new Date();
+  const minPlayers = n("min", 3);
+  const maxPlayers = n("max", 6);
+  const level = n("level", 1);
+  const renownReward = n("renown", 0);
+
+  if (
+    ![oneShotDate, prioritySignupAt, generalSignupAt, postAt].every(
+      (d) => Number.isFinite(d.getTime())
+    ) ||
+    prioritySignupAt >= generalSignupAt ||
+    generalSignupAt >= oneShotDate ||
+    minPlayers < 1 ||
+    maxPlayers < minPlayers ||
+    !Number.isInteger(minPlayers) ||
+    !Number.isInteger(maxPlayers) ||
+    !Number.isInteger(level) ||
+    level < 1 ||
+    !Number.isInteger(renownReward) ||
+    renownReward < 0
+  ) {
+    return "Check the dates, player limits, level, and Renown reward.";
+  }
+
+  const q = await db.quest.create({
+    data: {
+      title,
+      level,
+      description: s(fd, "description"),
+      renownReward,
+      oneShotDate,
+      prioritySignupAt,
+      generalSignupAt,
+      postAt,
+      minPlayers,
+      maxPlayers,
+    },
+  });
+
   return done(`Created "${q.title}".`);
 }
+
 export async function setLock(fd: FormData): R {
   await requireAdmin();
-  await db.quest.update({ where: { id: s(fd, "questId") }, data: { manualLock: s(fd, "value") === "1" } });
-  return done("Lock updated.");
+
+  const questId = s(fd, "questId");
+  const locking = s(fd, "value") === "1";
+
+  const result = await db.quest.updateMany({
+    where: {
+      id: questId,
+      status: "active",
+    },
+    data: {
+      manualLock: locking,
+      ...(locking
+        ? {}
+        : {
+            generalSignupAt: new Date(),
+            postAt: new Date(),
+          }),
+    },
+  });
+
+  if (!result.count) return "Quest not found or is not active.";
+  return done(locking ? "Quest locked." : "Quest unlocked. General sign-ups are open now.");
 }
+
+export async function rescheduleQuest(fd: FormData): R {
+  await requireAdmin();
+
+  const questId = s(fd, "questId");
+  const rawDate = s(fd, "oneShot");
+
+  if (!rawDate) return "Choose a new one-shot date.";
+
+  const oneShotDate = zonedToUtc(rawDate);
+  if (!Number.isFinite(oneShotDate.getTime())) return "Invalid one-shot date.";
+
+  const result = await db.quest.updateMany({
+    where: {
+      id: questId,
+      status: { in: ["active", "postponed"] },
+    },
+    data: { oneShotDate },
+  });
+
+  if (!result.count) return "Quest not found or cannot be rescheduled.";
+  return done("One-shot date updated.");
+}
+
+export async function deferQuest(fd: FormData): R {
+  await requireAdmin();
+
+  const result = await db.quest.updateMany({
+    where: { id: s(fd, "questId"), status: "active" },
+    data: { status: "postponed", manualLock: true },
+  });
+
+  if (!result.count) return "Only active quests can be deferred.";
+  return done("Quest deferred. It is hidden from players until reactivated.");
+}
+
+export async function reactivateQuest(fd: FormData): R {
+  await requireAdmin();
+
+  const questId = s(fd, "questId");
+  const oneShot = s(fd, "oneShot");
+  const priority = s(fd, "priority");
+  const general = s(fd, "general");
+  const post = s(fd, "post");
+
+  if (!oneShot || !priority || !general) {
+    return "One-shot, priority sign-up, and general sign-up dates are required.";
+  }
+
+  const oneShotDate = zonedToUtc(oneShot);
+  const prioritySignupAt = zonedToUtc(priority);
+  const generalSignupAt = zonedToUtc(general);
+  const postAt = post ? zonedToUtc(post) : new Date();
+
+  if (
+    ![oneShotDate, prioritySignupAt, generalSignupAt, postAt].every(
+      (d) => Number.isFinite(d.getTime())
+    ) ||
+    prioritySignupAt >= generalSignupAt ||
+    generalSignupAt >= oneShotDate
+  ) {
+    return "Check the dates. Priority sign-up must open before general sign-up, which must open before the quest.";
+  }
+
+  const result = await db.quest.updateMany({
+    where: { id: questId, status: "postponed" },
+    data: {
+      status: "active",
+      manualLock: false,
+      oneShotDate,
+      prioritySignupAt,
+      generalSignupAt,
+      postAt,
+    },
+  });
+
+  if (!result.count) return "Quest not found or is not deferred.";
+  return done("Quest reactivated with the new dates.");
+}
+
 export async function cancelQuest(fd: FormData): R {
   await requireAdmin();
-  await db.quest.updateMany({ where: { id: s(fd, "questId"), status: { in: ["active", "postponed"] } }, data: { status: "cancelled" } });
-  return done("Quest cancelled.");
+
+  const questId = s(fd, "questId");
+
+  const msg = await db.$transaction(async (tx) => {
+    const q = await tx.quest.findUnique({
+      where: { id: questId },
+      select: { id: true, status: true },
+    });
+
+    if (!q) return "Quest not found.";
+
+    if (q.status === "completed") {
+      return "Completed quests cannot be deleted.";
+    }
+
+    const payouts = await tx.ledger.count({
+      where: { questId },
+    });
+
+    if (payouts > 0) {
+      return "This quest has Renown ledger records and cannot be deleted without affecting history.";
+    }
+
+    await tx.signup.deleteMany({
+      where: { questId },
+    });
+
+    await tx.quest.delete({
+      where: { id: questId },
+    });
+
+    return "Quest permanently deleted.";
+  });
+
+  return done(msg);
 }
+
+export async function updateQuest(fd: FormData): R {
+  await requireAdmin();
+
+  const questId = s(fd, "questId");
+  const title = s(fd, "title");
+  const oneShot = s(fd, "oneShot");
+  const priority = s(fd, "priority");
+  const general = s(fd, "general");
+  const post = s(fd, "post");
+
+  const level = Number(s(fd, "level"));
+  const renownReward = Number(s(fd, "renown"));
+  const minPlayers = Number(s(fd, "min"));
+  const maxPlayers = Number(s(fd, "max"));
+
+  if (!title || !oneShot || !priority || !general || !post) {
+    return "Title and all dates are required.";
+  }
+
+  if (
+    !Number.isInteger(level) || level < 1 ||
+    !Number.isInteger(renownReward) || renownReward < 0 ||
+    !Number.isInteger(minPlayers) || minPlayers < 1 ||
+    !Number.isInteger(maxPlayers) || maxPlayers < minPlayers
+  ) {
+    return "Check the level, reward, and player limits.";
+  }
+
+  const oneShotDate = zonedToUtc(oneShot);
+  const prioritySignupAt = zonedToUtc(priority);
+  const generalSignupAt = zonedToUtc(general);
+  const postAt = zonedToUtc(post);
+
+  if (
+    ![oneShotDate, prioritySignupAt, generalSignupAt, postAt].every(
+      (d) => Number.isFinite(d.getTime())
+    ) ||
+    prioritySignupAt >= generalSignupAt ||
+    generalSignupAt >= oneShotDate
+  ) {
+    return "Check the dates. Priority sign-up must open before general sign-up, which must open before the quest.";
+  }
+
+  const result = await db.quest.updateMany({
+    where: {
+      id: questId,
+      status: { in: ["active", "postponed"] },
+    },
+    data: {
+      title,
+      description: s(fd, "description"),
+      level,
+      renownReward,
+      minPlayers,
+      maxPlayers,
+      oneShotDate,
+      prioritySignupAt,
+      generalSignupAt,
+      postAt,
+    },
+  });
+
+  if (!result.count) return "Quest not found or cannot be edited.";
+  return done("Quest updated.");
+}
+
 export async function unpostpone(fd: FormData): R {
   await requireAdmin();
   const d = s(fd, "oneShot");

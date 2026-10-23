@@ -30,26 +30,47 @@ export default async function Admin() {
               <Link href={`/admin/quest/${q.id}`}><strong>{q.title}</strong></Link>
               {" "}· {q.status}{q.manualLock ? " (locked)" : ""} · {fmt(q.oneShotDate)} · {q._count.signups}/{q.maxPlayers}
             </span>
-            {(q.status === "active" || q.status === "postponed") && (
-              <span className="inline">
-                <ActionForm action={A.setLock} className="inline">
-                  <input type="hidden" name="questId" value={q.id} />
-                  <input type="hidden" name="value" value={q.manualLock ? "0" : "1"} />
-                  <button>{q.manualLock ? "Unlock" : "Lock"}</button>
-                </ActionForm>
-                {q.status === "postponed" && (
-                  <ActionForm action={A.unpostpone} className="inline">
-                    <input type="hidden" name="questId" value={q.id} />
-                    <input name="oneShot" type="datetime-local" aria-label="New one-shot date" />
-                    <button>Reactivate</button>
-                  </ActionForm>
-                )}
-                <ActionForm action={A.cancelQuest} className="inline">
-                  <input type="hidden" name="questId" value={q.id} />
-                  <button>Cancel</button>
-                </ActionForm>
-              </span>
-            )}
+            <span className="inline">
+  <ActionForm action={A.setLock} className="inline">
+    <input type="hidden" name="questId" value={q.id} />
+    <input
+      type="hidden"
+      name="value"
+      value={q.manualLock ? "0" : "1"}
+    />
+    <button>{q.manualLock ? "Unlock" : "Lock"}</button>
+  </ActionForm>
+
+  <ActionForm action={A.rescheduleQuest} className="inline">
+    <input type="hidden" name="questId" value={q.id} />
+    <input
+      name="oneShot"
+      type="datetime-local"
+      aria-label="New one-shot date"
+      required
+    />
+    <button>Reschedule</button>
+  </ActionForm>
+
+  {q.status === "active" && (
+    <ActionForm action={A.deferQuest} className="inline">
+      <input type="hidden" name="questId" value={q.id} />
+      <button>Defer</button>
+    </ActionForm>
+  )}
+
+  {q.status === "postponed" && (
+    <ActionForm action={A.reactivateQuest} className="inline">
+      <input type="hidden" name="questId" value={q.id} />
+      <button>Reactivate</button>
+    </ActionForm>
+  )}
+
+  <ActionForm action={A.cancelQuest} className="inline">
+    <input type="hidden" name="questId" value={q.id} />
+    <button>Delete permanently</button>
+  </ActionForm>
+</span>
           </div>
         ))}
       </article>

@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { COOKIE, requireAdmin, requireUser, startSession } from "@/lib/auth";
-import { CLASSES, DAY, FIRST_QUEST_BONUS, PRIORITY_WINDOW_DAYS, TZ, doorState, fmt, zonedToUtc } from "@/lib/util";
+import { CLASSES, DAY, FIRST_QUEST_BONUS, ITEM_TYPES, PRIORITY_WINDOW_DAYS, TZ, doorState, fmt, zonedToUtc } from "@/lib/util";
 
 type R = Promise<string | void>;
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -473,4 +473,176 @@ export async function completeQuest(fd: FormData): R {
     return "Quest completed and renown paid out.";
   });
   return done(msg);
+}
+
+/* ---------- admin: store ---------- */
+
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+
+// Accepts "example.com" or "https://example.com/page". Only http(s) is allowed,
+// so a "javascript:" link can never end up in an href.
+function cleanUrl(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+// Identifies the image by its first bytes rather than trusting the browser's
+// file type. SVG is deliberately not allowed (it can carry scripts).
+function sniffImage(b: Buffer): string | null {
+  if (b.length > 12 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b.length > 12 && b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  if (b.length > 6 && ["GIF87a", "GIF89a"].includes(b.subarray(0, 6).toString("ascii"))) return "image/gif";
+  return null;
+}
+
+// null = no file chosen, string = error message, object = a valid image.
+async function readImage(fd: FormData): Promise<null | string | { mime: string; data: Buffer }> {
+  const f = fd.get("image");
+  if (!(f instanceof File) || f.size === 0) return null;
+  if (f.size > MAX_IMAGE_BYTES) return "The image must be 2 MB or smaller.";
+  const data = Buffer.from(await f.arrayBuffer());
+  const mime = sniffImage(data);
+  if (!mime) return "The image must be a PNG, JPEG, WebP or GIF.";
+  return { mime, data };
+}
+
+function parseItem(fd: FormData) {
+  const name = s(fd, "name");
+  const rawPrice = s(fd, "price");
+  const price = Number(rawPrice);
+  const type = s(fd, "type");
+  const labelId = s(fd, "labelId");
+
+  if (!name) return "Enter an item name.";
+  if (name.length > 100) return "Item name must be 100 characters or fewer.";
+  if (rawPrice === "" || !Number.isInteger(price) || price < 0) return "Price must be a whole number of Renown, 0 or more.";
+  if (!(ITEM_TYPES as readonly string[]).includes(type)) return "Pick an item type.";
+  if (!labelId) return "Choose a label for this item.";
+
+  return { name, price, type, labelId, description: s(fd, "description"), statSheet: s(fd, "statSheet") };
+}
+
+export async function createItem(fd: FormData): R {
+  await requireAdmin();
+  const data = parseItem(fd);
+  if (typeof data === "string") return data;
+  if (!(await db.itemLabel.findUnique({ where: { id: data.labelId }, select: { id: true } }))) return "Choose a label for this item.";
+
+  const img = await readImage(fd);
+  if (typeof img === "string") return img;
+
+  const rawLink = s(fd, "linkUrl");
+  const link = rawLink ? cleanUrl(rawLink) : null;
+  if (rawLink && !link) return "The source link must be a valid web address.";
+
+  const item = await db.shopItem.create({
+    data: {
+      ...data,
+      ...(img ? { image: { create: img } } : {}),
+      ...(link ? { links: { create: [{ url: link, label: s(fd, "linkLabel") || new URL(link).hostname.replace(/^www\./, "") }] } } : {}),
+    },
+  });
+  return done(`Created "${item.name}".`);
+}
+
+export async function updateItem(fd: FormData): R {
+  await requireAdmin();
+  const itemId = s(fd, "itemId");
+  const data = parseItem(fd);
+  if (typeof data === "string") return data;
+  if (!(await db.itemLabel.findUnique({ where: { id: data.labelId }, select: { id: true } }))) return "Choose a label for this item.";
+
+  const img = await readImage(fd);
+  if (typeof img === "string") return img;
+  const removeImage = s(fd, "removeImage") === "on";
+
+  const msg = await db.$transaction(async (tx) => {
+    const r = await tx.shopItem.updateMany({ where: { id: itemId }, data });
+    if (!r.count) return "Item not found.";
+    // A new image replaces the old one; a new id also busts the browser cache.
+    if (img || removeImage) await tx.itemImage.deleteMany({ where: { itemId } });
+    if (img) await tx.itemImage.create({ data: { itemId, ...img } });
+    return "Item updated.";
+  });
+  return done(msg);
+}
+
+export async function setItemActive(fd: FormData): R {
+  await requireAdmin();
+  const active = s(fd, "value") === "1";
+  const result = await db.shopItem.updateMany({ where: { id: s(fd, "itemId") }, data: { isActive: active } });
+  if (!result.count) return "Item not found.";
+  return done(active ? "Item restored to the store." : "Item archived.");
+}
+
+export async function deleteItem(fd: FormData): R {
+  await requireAdmin();
+  // TODO: once inventory exists, refuse to delete items that players own
+  // (archive them instead) so purchase history stays intact.
+  // The item's image and links are removed with it (cascade).
+  const result = await db.shopItem.deleteMany({ where: { id: s(fd, "itemId") } });
+  if (!result.count) return "Item not found.";
+  return done("Item permanently deleted.");
+}
+
+export async function addItemLink(fd: FormData): R {
+  await requireAdmin();
+  const itemId = s(fd, "itemId");
+  const url = cleanUrl(s(fd, "url"));
+  if (!url) return "Enter a valid web address (http or https).";
+  if (!(await db.shopItem.findUnique({ where: { id: itemId }, select: { id: true } }))) return "Item not found.";
+
+  const label = s(fd, "label") || new URL(url).hostname.replace(/^www\./, "");
+  await db.itemLink.create({ data: { itemId, label: label.slice(0, 60), url } });
+  return done("Source link added.");
+}
+
+export async function removeItemLink(fd: FormData): R {
+  await requireAdmin();
+  await db.itemLink.deleteMany({ where: { id: s(fd, "linkId") } });
+  return done("Source link removed.");
+}
+
+/* ---------- admin: store labels ---------- */
+
+function cleanLabel(raw: string): string | null {
+  const name = raw.replace(/\s+/g, " ").trim();
+  return name && name.length <= 30 ? name : null;
+}
+
+export async function createLabel(fd: FormData): R {
+  await requireAdmin();
+  const name = cleanLabel(s(fd, "name"));
+  if (!name) return "Enter a label name (up to 30 characters).";
+  if (await db.itemLabel.findFirst({ where: { name: { equals: name, mode: "insensitive" } } })) return "That label already exists.";
+  await db.itemLabel.create({ data: { name } });
+  return done(`Label "${name}" added.`);
+}
+
+export async function renameLabel(fd: FormData): R {
+  await requireAdmin();
+  const id = s(fd, "labelId");
+  const name = cleanLabel(s(fd, "name"));
+  if (!name) return "Enter a label name (up to 30 characters).";
+  if (await db.itemLabel.findFirst({ where: { id: { not: id }, name: { equals: name, mode: "insensitive" } } })) return "That label already exists.";
+  const result = await db.itemLabel.updateMany({ where: { id }, data: { name } });
+  if (!result.count) return "Label not found.";
+  return done(`Label renamed to "${name}".`);
+}
+
+export async function deleteLabel(fd: FormData): R {
+  await requireAdmin();
+  const id = s(fd, "labelId");
+  const inUse = await db.shopItem.count({ where: { labelId: id } });
+  if (inUse > 0) return `${inUse} item${inUse === 1 ? " uses" : "s use"} this label. Give ${inUse === 1 ? "it" : "them"} a different label first.`;
+  const result = await db.itemLabel.deleteMany({ where: { id } });
+  if (!result.count) return "Label not found.";
+  return done("Label deleted.");
 }

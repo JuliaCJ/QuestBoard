@@ -6,6 +6,7 @@ export const DAY = 86400000;
 export const FIRST_QUEST_BONUS = 50;
 export const PRIORITY_WINDOW_DAYS = 5;
 export const POSTPONE_LEAD_DAYS = 10;
+export const ITEM_TYPES = ["consumable", "equipable"] as const;
 
 const ALPHA = "abcdefghjkmnpqrstuvwxyz23456789";
 export const code = (n: number) => Array.from({ length: n }, () => ALPHA[randomInt(ALPHA.length)]).join("");

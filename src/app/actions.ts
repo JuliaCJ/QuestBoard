@@ -31,6 +31,54 @@ export async function login(fd: FormData): R {
 }
 export async function logout() { await (await cookies()).delete(COOKIE); redirect("/login"); }
 
+export async function deletePlayer(fd: FormData): R {
+  await requireAdmin();
+
+  const userId = s(fd, "userId");
+  const confirmation = s(fd, "confirmUsername").trim().toLowerCase();
+
+  if (!userId || !confirmation) {
+    return "Enter the username to confirm permanent deletion.";
+  }
+
+  return done(await db.$transaction(async (tx) => {
+    const player = await tx.user.findFirst({
+      where: { id: userId, role: "player" },
+      select: { id: true, username: true },
+    });
+
+    if (!player) return "Player not found.";
+
+    if (confirmation !== player.username.toLowerCase()) {
+      return "Username confirmation does not match. Nothing was deleted.";
+    }
+
+    // Remove records that require this player to exist.
+    await tx.signup.deleteMany({
+      where: { userId: player.id },
+    });
+
+    await tx.ledger.deleteMany({
+      where: { userId: player.id },
+    });
+
+    // Keep priority keys, but clear their association with this player.
+    await tx.priorityKey.updateMany({
+      where: { redeemedById: player.id },
+      data: {
+        redeemedById: null,
+        redeemedAt: null,
+      },
+    });
+
+    await tx.user.delete({
+      where: { id: player.id },
+    });
+
+    return `Player "${player.username}" permanently deleted.`;
+  }));
+}
+
 /* ---------- player ---------- */
 export async function signUp(fd: FormData): R {
   const u = await requireUser();

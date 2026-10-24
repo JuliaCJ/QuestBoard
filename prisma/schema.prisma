@@ -74,6 +74,13 @@ model Ledger {
   user      User     @relation(fields: [userId], references: [id])
 }
 
+model ItemLabel {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  items     ShopItem[]
+}
+
 model ShopItem {
   id          String      @id @default(cuid())
   name        String
@@ -81,10 +88,21 @@ model ShopItem {
   price       Int
   type        String      @default("consumable") // "consumable" | "equipable"
   statSheet   String      @default("")
-  isActive    Boolean     @default(true)         // false = archived (soft delete)
+  isActive    Boolean     @default(true)         // false = archived
   createdAt   DateTime    @default(now())
+  labelId     String
+  label       ItemLabel   @relation(fields: [labelId], references: [id], onDelete: Restrict)
   links       ItemLink[]
   image       ItemImage?
+}
+
+model ItemImage {
+  id        String   @id @default(cuid())
+  itemId    String   @unique
+  item      ShopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  mime      String
+  data      Bytes
+  createdAt DateTime @default(now())
 }
 
 model ItemLink {
@@ -98,11 +116,3 @@ model ItemLink {
   @@index([itemId])
 }
 
-model ItemImage {
-  id        String   @id @default(cuid())
-  itemId    String   @unique
-  item      ShopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  mime      String
-  data      Bytes
-  createdAt DateTime @default(now())
-}

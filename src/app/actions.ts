@@ -475,8 +475,10 @@ export async function completeQuest(fd: FormData): R {
   return done(msg);
 }
 
+/* ---------- admin: store ---------- */
+
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
- 
+
 // Accepts "example.com" or "https://example.com/page". Only http(s) is allowed,
 // so a "javascript:" link can never end up in an href.
 function cleanUrl(raw: string): string | null {
@@ -489,7 +491,7 @@ function cleanUrl(raw: string): string | null {
     return null;
   }
 }
- 
+
 // Identifies the image by its first bytes rather than trusting the browser's
 // file type. SVG is deliberately not allowed (it can carry scripts).
 function sniffImage(b: Buffer): string | null {
@@ -499,7 +501,7 @@ function sniffImage(b: Buffer): string | null {
   if (b.length > 6 && ["GIF87a", "GIF89a"].includes(b.subarray(0, 6).toString("ascii"))) return "image/gif";
   return null;
 }
- 
+
 // null = no file chosen, string = error message, object = a valid image.
 async function readImage(fd: FormData): Promise<null | string | { mime: string; data: Buffer }> {
   const f = fd.get("image");
@@ -510,33 +512,36 @@ async function readImage(fd: FormData): Promise<null | string | { mime: string; 
   if (!mime) return "The image must be a PNG, JPEG, WebP or GIF.";
   return { mime, data };
 }
- 
+
 function parseItem(fd: FormData) {
   const name = s(fd, "name");
   const rawPrice = s(fd, "price");
   const price = Number(rawPrice);
   const type = s(fd, "type");
- 
+  const labelId = s(fd, "labelId");
+
   if (!name) return "Enter an item name.";
   if (name.length > 100) return "Item name must be 100 characters or fewer.";
   if (rawPrice === "" || !Number.isInteger(price) || price < 0) return "Price must be a whole number of Renown, 0 or more.";
   if (!(ITEM_TYPES as readonly string[]).includes(type)) return "Pick an item type.";
- 
-  return { name, price, type, description: s(fd, "description"), statSheet: s(fd, "statSheet") };
+  if (!labelId) return "Choose a label for this item.";
+
+  return { name, price, type, labelId, description: s(fd, "description"), statSheet: s(fd, "statSheet") };
 }
- 
+
 export async function createItem(fd: FormData): R {
   await requireAdmin();
   const data = parseItem(fd);
   if (typeof data === "string") return data;
- 
+  if (!(await db.itemLabel.findUnique({ where: { id: data.labelId }, select: { id: true } }))) return "Choose a label for this item.";
+
   const img = await readImage(fd);
   if (typeof img === "string") return img;
- 
+
   const rawLink = s(fd, "linkUrl");
   const link = rawLink ? cleanUrl(rawLink) : null;
   if (rawLink && !link) return "The source link must be a valid web address.";
- 
+
   const item = await db.shopItem.create({
     data: {
       ...data,
@@ -546,17 +551,18 @@ export async function createItem(fd: FormData): R {
   });
   return done(`Created "${item.name}".`);
 }
- 
+
 export async function updateItem(fd: FormData): R {
   await requireAdmin();
   const itemId = s(fd, "itemId");
   const data = parseItem(fd);
   if (typeof data === "string") return data;
- 
+  if (!(await db.itemLabel.findUnique({ where: { id: data.labelId }, select: { id: true } }))) return "Choose a label for this item.";
+
   const img = await readImage(fd);
   if (typeof img === "string") return img;
   const removeImage = s(fd, "removeImage") === "on";
- 
+
   const msg = await db.$transaction(async (tx) => {
     const r = await tx.shopItem.updateMany({ where: { id: itemId }, data });
     if (!r.count) return "Item not found.";
@@ -567,7 +573,7 @@ export async function updateItem(fd: FormData): R {
   });
   return done(msg);
 }
- 
+
 export async function setItemActive(fd: FormData): R {
   await requireAdmin();
   const active = s(fd, "value") === "1";
@@ -575,7 +581,7 @@ export async function setItemActive(fd: FormData): R {
   if (!result.count) return "Item not found.";
   return done(active ? "Item restored to the store." : "Item archived.");
 }
- 
+
 export async function deleteItem(fd: FormData): R {
   await requireAdmin();
   // TODO: once inventory exists, refuse to delete items that players own
@@ -585,21 +591,58 @@ export async function deleteItem(fd: FormData): R {
   if (!result.count) return "Item not found.";
   return done("Item permanently deleted.");
 }
- 
+
 export async function addItemLink(fd: FormData): R {
   await requireAdmin();
   const itemId = s(fd, "itemId");
   const url = cleanUrl(s(fd, "url"));
   if (!url) return "Enter a valid web address (http or https).";
   if (!(await db.shopItem.findUnique({ where: { id: itemId }, select: { id: true } }))) return "Item not found.";
- 
+
   const label = s(fd, "label") || new URL(url).hostname.replace(/^www\./, "");
   await db.itemLink.create({ data: { itemId, label: label.slice(0, 60), url } });
   return done("Source link added.");
 }
- 
+
 export async function removeItemLink(fd: FormData): R {
   await requireAdmin();
   await db.itemLink.deleteMany({ where: { id: s(fd, "linkId") } });
   return done("Source link removed.");
+}
+
+/* ---------- admin: store labels ---------- */
+
+function cleanLabel(raw: string): string | null {
+  const name = raw.replace(/\s+/g, " ").trim();
+  return name && name.length <= 30 ? name : null;
+}
+
+export async function createLabel(fd: FormData): R {
+  await requireAdmin();
+  const name = cleanLabel(s(fd, "name"));
+  if (!name) return "Enter a label name (up to 30 characters).";
+  if (await db.itemLabel.findFirst({ where: { name: { equals: name, mode: "insensitive" } } })) return "That label already exists.";
+  await db.itemLabel.create({ data: { name } });
+  return done(`Label "${name}" added.`);
+}
+
+export async function renameLabel(fd: FormData): R {
+  await requireAdmin();
+  const id = s(fd, "labelId");
+  const name = cleanLabel(s(fd, "name"));
+  if (!name) return "Enter a label name (up to 30 characters).";
+  if (await db.itemLabel.findFirst({ where: { id: { not: id }, name: { equals: name, mode: "insensitive" } } })) return "That label already exists.";
+  const result = await db.itemLabel.updateMany({ where: { id }, data: { name } });
+  if (!result.count) return "Label not found.";
+  return done(`Label renamed to "${name}".`);
+}
+
+export async function deleteLabel(fd: FormData): R {
+  await requireAdmin();
+  const id = s(fd, "labelId");
+  const inUse = await db.shopItem.count({ where: { labelId: id } });
+  if (inUse > 0) return `${inUse} item${inUse === 1 ? " uses" : "s use"} this label. Give ${inUse === 1 ? "it" : "them"} a different label first.`;
+  const result = await db.itemLabel.deleteMany({ where: { id } });
+  if (!result.count) return "Label not found.";
+  return done("Label deleted.");
 }

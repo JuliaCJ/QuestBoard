@@ -6,12 +6,21 @@ import { ITEM_TYPES } from "@/lib/util";
 import * as A from "@/app/actions";
 
 type Item = Awaited<ReturnType<typeof loadItems>>[number];
+type Label = Awaited<ReturnType<typeof loadLabels>>[number];
+
+function loadLabels() {
+  return db.itemLabel.findMany({
+    orderBy: { name: "asc" },
+    include: { _count: { select: { items: true } } },
+  });
+}
 
 function loadItems(onlyActive: boolean) {
   return db.shopItem.findMany({
     where: onlyActive ? { isActive: true } : {},
     orderBy: { name: "asc" },
     include: {
+      label: true,
       links: { orderBy: { createdAt: "asc" } },
       image: { select: { id: true } }, // never load the image bytes here
     },
@@ -46,6 +55,21 @@ function TypeSelect({ defaultValue }: { defaultValue?: string }) {
   );
 }
 
+function LabelSelect({ labels, defaultValue }: { labels: Label[]; defaultValue?: string }) {
+  return (
+    <select name="labelId" defaultValue={defaultValue ?? ""} required>
+      <option value="" disabled>
+        Choose a label…
+      </option>
+      {labels.map((l) => (
+        <option key={l.id} value={l.id}>
+          {l.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /* ---------------- Player view (read-only) ---------------- */
 
 function PlayerStore({ items }: { items: Item[] }) {
@@ -64,7 +88,7 @@ function PlayerStore({ items }: { items: Item[] }) {
             <div className="stack">
               <h2 style={{ margin: 0 }}>{item.name}</h2>
               <p style={{ margin: 0 }}>
-                <span className="cap">{item.type}</span> · <strong>{item.price} Renown</strong>
+                {item.label.name} · <span className="cap">{item.type}</span> · <strong>{item.price} Renown</strong>
               </p>
               {item.description && <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{item.description}</p>}
               {item.statSheet && (
@@ -96,9 +120,9 @@ function PlayerStore({ items }: { items: Item[] }) {
 
 /* ---------------- Admin view ---------------- */
 
-function ItemRow({ item }: { item: Item }) {
+function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
   // Remount the edit form whenever saved values change so fields show what is saved.
-  const formKey = [item.name, item.description, item.price, item.type, item.image?.id ?? "", item.statSheet].join("|");
+  const formKey = [item.name, item.description, item.price, item.type, item.labelId, item.image?.id ?? "", item.statSheet].join("|");
 
   return (
     <details className="item">
@@ -106,7 +130,7 @@ function ItemRow({ item }: { item: Item }) {
         <Thumb item={item} small />
         <strong>{item.name}</strong>
         <span>
-          · <span className="cap">{item.type}</span> · {item.price} Renown
+          · {item.label.name} · <span className="cap">{item.type}</span> · {item.price} Renown
           {item.links.length > 0 ? ` · ${item.links.length} source link${item.links.length === 1 ? "" : "s"}` : ""}
         </span>
       </summary>
@@ -130,6 +154,10 @@ function ItemRow({ item }: { item: Item }) {
             <label>
               Type
               <TypeSelect defaultValue={item.type} />
+            </label>
+            <label>
+              Label
+              <LabelSelect labels={labels} defaultValue={item.labelId} />
             </label>
           </div>
 
@@ -199,7 +227,7 @@ function ItemRow({ item }: { item: Item }) {
   );
 }
 
-function AdminStore({ items }: { items: Item[] }) {
+function AdminStore({ items, labels }: { items: Item[]; labels: Label[] }) {
   const active = items.filter((i) => i.isActive);
   const archived = items.filter((i) => !i.isActive);
 
@@ -214,8 +242,36 @@ function AdminStore({ items }: { items: Item[] }) {
         <h2>Items ({active.length})</h2>
         {active.length === 0 && <p>No items yet. Add your first one below.</p>}
         {active.map((i) => (
-          <ItemRow key={i.id} item={i} />
+          <ItemRow key={i.id} item={i} labels={labels} />
         ))}
+      </article>
+
+      <article className="panel">
+        <h2>Labels ({labels.length})</h2>
+        <p>Every item gets exactly one label. A label can only be deleted when no item uses it.</p>
+        {labels.length === 0 && <p>No labels yet. Add one below (for example Weapon, Armor, Potion).</p>}
+        {labels.map((l) => (
+          <div className="row" key={l.id}>
+            <ActionForm key={l.id + l.name} action={A.renameLabel} className="inline">
+              <input type="hidden" name="labelId" value={l.id} />
+              <input name="name" defaultValue={l.name} aria-label={`Rename ${l.name}`} maxLength={30} required />
+              <button>Rename</button>
+            </ActionForm>
+            <ActionForm action={A.deleteLabel} className="inline">
+              <input type="hidden" name="labelId" value={l.id} />
+              <small>
+                {l._count.items} item{l._count.items === 1 ? "" : "s"}
+              </small>
+              <button disabled={l._count.items > 0} title={l._count.items > 0 ? "Re-label its items first" : undefined}>
+                Delete
+              </button>
+            </ActionForm>
+          </div>
+        ))}
+        <ActionForm action={A.createLabel} className="inline">
+          <input name="name" placeholder="New label (e.g. Weapon)" aria-label="New label name" maxLength={30} required />
+          <button>Add label</button>
+        </ActionForm>
       </article>
 
       <article className="panel">
@@ -238,7 +294,12 @@ function AdminStore({ items }: { items: Item[] }) {
               Type
               <TypeSelect />
             </label>
+            <label>
+              Label
+              <LabelSelect labels={labels} />
+            </label>
           </div>
+          {labels.length === 0 && <p className="note">Add a label in the Labels panel first.</p>}
           <label>
             Image (optional; PNG, JPEG, WebP or GIF, up to 2 MB)
             <input name="image" type="file" accept={IMAGE_ACCEPT} />
@@ -266,7 +327,7 @@ function AdminStore({ items }: { items: Item[] }) {
           <h2>Archived ({archived.length})</h2>
           <p>Hidden from players. Restore an item to bring it back, or delete it permanently.</p>
           {archived.map((i) => (
-            <ItemRow key={i.id} item={i} />
+            <ItemRow key={i.id} item={i} labels={labels} />
           ))}
         </article>
       )}
@@ -278,5 +339,6 @@ export default async function StorePage() {
   const u = await requireUser();
   const isAdmin = u.role === "admin";
   const items = await loadItems(!isAdmin);
-  return isAdmin ? <AdminStore items={items} /> : <PlayerStore items={items} />;
+  if (!isAdmin) return <PlayerStore items={items} />;
+  return <AdminStore items={items} labels={await loadLabels()} />;
 }

@@ -25,7 +25,7 @@ export default async function Root({ children }: { children: React.ReactNode }) 
             {u.role !== "admin" && <><Link href="/store">Renown Store</Link>{" | "}</>}
 
             <span className="grow" />
-            <b>{u.renown} Renown</b>
+            {u.role !== "admin" && <b>{u.renown} Renown</b>}
             <form action={logout}><button className="link">Log out</button></form>
           </header>
         )}

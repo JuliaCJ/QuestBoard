@@ -12,7 +12,13 @@ export default async function Admin() {
       orderBy: { oneShotDate: "desc" },
       include: { _count: { select: { signups: { where: { status: "signed_up" } } } } },
     }),
-    db.user.findMany({ where: { role: "player", isActive: true }, orderBy: { displayName: "asc" } }),
+    db.user.findMany({
+  where: { role: "player" },
+  orderBy: [
+    { isActive: "desc" },
+    { displayName: "asc" }
+  ]
+}),
     db.priorityKey.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { redeemedBy: true } }),
   ]);
   const currentQuests = quests.filter(
@@ -48,10 +54,17 @@ const pastQuests = quests.filter(
                     <input type="hidden" name="value" value={p.hasPriority ? "0" : "1"} />
                     <button>{p.hasPriority ? "Remove priority" : "Grant priority"}</button>
                   </ActionForm>
-                  <ActionForm action={A.deactivate} className="inline">
-                    <input type="hidden" name="userId" value={p.id} />
-                    <button>Remove player</button>
-                  </ActionForm>
+                  {p.isActive ? (
+  <ActionForm action={A.deactivate} className="inline">
+    <input type="hidden" name="userId" value={p.id} />
+    <button>Remove player</button>
+  </ActionForm>
+) : (
+  <ActionForm action={A.reactivatePlayer} className="inline">
+    <input type="hidden" name="userId" value={p.id} />
+    <button>Reactivate player</button>
+  </ActionForm>
+)}
                 </span>
               </div>
               <ActionForm action={A.adjustRenown} className="inline">

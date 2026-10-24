@@ -646,3 +646,20 @@ export async function deleteLabel(fd: FormData): R {
   if (!result.count) return "Label not found.";
   return done("Label deleted.");
 }
+
+export async function reactivatePlayer(formData: FormData) {
+  await requireAdmin();
+
+  const userId = String(formData.get("userId") ?? "");
+
+  if (!userId) {
+    throw new Error("Missing player ID");
+  }
+
+  await db.user.update({
+    where: { id: userId },
+    data: { isActive: true },
+  });
+
+  revalidatePath("/admin");
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { logout } from "./actions";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next"
 
 const head = IM_Fell_English({ weight: "400", subsets: ["latin"], variable: "--head" });
 const body = Alegreya_Sans({ weight: ["400", "700"], subsets: ["latin"], variable: "--body" });

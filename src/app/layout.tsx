@@ -21,7 +21,9 @@ export default async function Root({ children }: { children: React.ReactNode }) 
             <Link href="/">Quest Board</Link> { " | "}
             {u.role === "admin" && <><Link href="/admin">Player Portal</Link>{" | "}</>}
             {u.role === "admin" && <><Link href="/quest">Quest Portal</Link>{" | "}</>}
-            
+            {u.role === "admin" && <><Link href="/store">Store Page</Link>{" | "}</>}
+            {u.role !== "admin" && <><Link href="/store">Renown Store</Link>{" | "}</>}
+
             <span className="grow" />
             <b>{u.renown} Renown</b>
             <form action={logout}><button className="link">Log out</button></form>

@@ -1,4 +1,5 @@
 import ActionForm from "@/components/ActionForm";
+import ConfirmButton from "@/components/ConfirmButton";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ITEM_TYPES } from "@/lib/util";
@@ -27,10 +28,10 @@ function host(url: string) {
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
 
-function Thumb({ item }: { item: Item }) {
-  if (!item.image) return null;
+function Thumb({ item, small }: { item: Item; small?: boolean }) {
+  if (!item.image) return small ? <span className="thumb thumb-sm thumb-empty" aria-hidden="true" /> : null;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="thumb" src={`/api/store-image/${item.image.id}`} alt={item.name} />;
+  return <img className={small ? "thumb thumb-sm" : "thumb"} src={`/api/store-image/${item.image.id}`} alt={small ? "" : item.name} />;
 }
 
 function TypeSelect({ defaultValue }: { defaultValue?: string }) {
@@ -102,6 +103,7 @@ function ItemRow({ item }: { item: Item }) {
   return (
     <details className="item">
       <summary>
+        <Thumb item={item} small />
         <strong>{item.name}</strong>
         <span>
           · <span className="cap">{item.type}</span> · {item.price} Renown
@@ -185,12 +187,12 @@ function ItemRow({ item }: { item: Item }) {
             <input type="hidden" name="value" value={item.isActive ? "0" : "1"} />
             <button>{item.isActive ? "Archive (hide from store)" : "Restore to store"}</button>
           </ActionForm>
-          {!item.isActive && (
-            <ActionForm action={A.deleteItem} className="inline">
-              <input type="hidden" name="itemId" value={item.id} />
-              <button>Delete permanently</button>
-            </ActionForm>
-          )}
+          <ActionForm action={A.deleteItem} className="inline">
+            <input type="hidden" name="itemId" value={item.id} />
+            <ConfirmButton message={`Permanently delete "${item.name}"? This also removes its image and source links, and can't be undone.`}>
+              Delete permanently
+            </ConfirmButton>
+          </ActionForm>
         </div>
       </div>
     </details>

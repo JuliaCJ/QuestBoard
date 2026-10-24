@@ -63,6 +63,8 @@ label{display:grid;gap:.25rem;font-weight:700}
 .shopcard{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;padding:1rem 0}
 .shopcard .stack{flex:1;min-width:200px}
 
+.thumb.thumb-sm{width:48px;max-width:48px;height:48px;border-width:1px;flex:0 0 auto}
+.thumb-empty{background:#0001;border-style:dashed}
 
 @media(max-width:600px){.hall{gap:1.5rem;padding:2rem 1rem 90px}}
 @media(prefers-reduced-motion:no-preference){.door{transition:transform .15s}.door:hover{transform:translateY(-5px)}}

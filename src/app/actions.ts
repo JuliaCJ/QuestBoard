@@ -581,8 +581,8 @@ export async function deleteItem(fd: FormData): R {
   // TODO: once inventory exists, refuse to delete items that players own
   // (archive them instead) so purchase history stays intact.
   // The item's image and links are removed with it (cascade).
-  const result = await db.shopItem.deleteMany({ where: { id: s(fd, "itemId"), isActive: false } });
-  if (!result.count) return "Only archived items can be permanently deleted.";
+  const result = await db.shopItem.deleteMany({ where: { id: s(fd, "itemId") } });
+  if (!result.count) return "Item not found.";
   return done("Item permanently deleted.");
 }
  

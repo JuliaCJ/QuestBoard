@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fmt } from "@/lib/util";
 import * as A from "@/app/actions";
+import PlayerEditor from "@/components/PlayerEditor";
 
 export default async function Admin() {
   await requireAdmin();
@@ -112,44 +113,14 @@ export default async function Admin() {
             </span>
           </div>
 
-          {p.isActive && (
-            <>
-              <ActionForm action={A.adjustRenown} className="inline">
-                <input type="hidden" name="userId" value={p.id} />
-                <input
-                  name="amount"
-                  type="number"
-                  placeholder="Renown (+/-)"
-                />
-                <input name="note" placeholder="Note" />
-                <button>Adjust Renown</button>
-              </ActionForm>
+          <div className="inline">
+  {p.isActive && <PlayerEditor userId={p.id} />}
 
-              <ActionForm action={A.resetPassword} className="inline">
-                <input type="hidden" name="userId" value={p.id} />
-                <input
-                  name="password"
-                  type="text"
-                  placeholder="New password"
-                  autoComplete="off"
-                />
-                <button>Reset password</button>
-              </ActionForm>
-            </>
-          )}
-
-          <ActionForm action={A.deletePlayer} className="inline">
-  <input type="hidden" name="userId" value={p.id} />
-  <button
-    onClick={(e) => {
-      if (!confirm(`Permanently delete ${p.username}? This cannot be undone.`)) {
-        e.preventDefault();
-      }
-    }}
-  >
-    Delete
-  </button>
-</ActionForm>
+  <ActionForm action={A.deletePlayer} className="inline">
+    <input type="hidden" name="userId" value={p.id} />
+    <button>Delete</button>
+  </ActionForm>
+</div>
         </div>
       );
     });

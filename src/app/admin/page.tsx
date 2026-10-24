@@ -138,21 +138,18 @@ export default async function Admin() {
             </>
           )}
 
-          <ActionForm action={A.deletePlayer} className="stack">
-            <input type="hidden" name="userId" value={p.id} />
-
-            <label>
-              Permanently delete {p.username}
-              <input
-                name="confirmUsername"
-                placeholder="Type username to confirm"
-                autoComplete="off"
-                required
-              />
-            </label>
-
-            <button>Permanently Delete Player</button>
-          </ActionForm>
+          <ActionForm action={A.deletePlayer} className="inline">
+  <input type="hidden" name="userId" value={p.id} />
+  <button
+    onClick={(e) => {
+      if (!confirm(`Permanently delete ${p.username}? This cannot be undone.`)) {
+        e.preventDefault();
+      }
+    }}
+  >
+    Delete
+  </button>
+</ActionForm>
         </div>
       );
     });

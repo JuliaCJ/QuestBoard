@@ -35,11 +35,10 @@ export async function deletePlayer(fd: FormData): R {
   await requireAdmin();
 
   const userId = s(fd, "userId");
-  const confirmation = s(fd, "confirmUsername").trim().toLowerCase();
-
-  if (!userId || !confirmation) {
-    return "Enter the username to confirm permanent deletion.";
-  }
+  
+  if (!userId) {
+  return "Missing player ID.";
+}
 
   return done(await db.$transaction(async (tx) => {
     const player = await tx.user.findFirst({
@@ -49,9 +48,6 @@ export async function deletePlayer(fd: FormData): R {
 
     if (!player) return "Player not found.";
 
-    if (confirmation !== player.username.toLowerCase()) {
-      return "Username confirmation does not match. Nothing was deleted.";
-    }
 
     // Remove records that require this player to exist.
     await tx.signup.deleteMany({

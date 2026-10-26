@@ -27,6 +27,17 @@ function loadItems(onlyActive: boolean) {
   });
 }
 
+// Groups items by label, labels sorted A-Z; items keep their existing (name) order.
+function groupByLabel(items: Item[]) {
+  const groups = new Map<string, { label: Item["label"]; items: Item[] }>();
+  for (const item of items) {
+    const g = groups.get(item.labelId);
+    if (g) g.items.push(item);
+    else groups.set(item.labelId, { label: item.label, items: [item] });
+  }
+  return [...groups.values()].sort((a, b) => a.label.name.localeCompare(b.label.name));
+}
+
 function host(url: string) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -80,23 +91,25 @@ function PlayerStore({ items }: { items: Item[] }) {
         <p>Items you can spend Renown on. Purchasing is coming soon.</p>
       </article>
 
-      <article className="panel">
-        {items.length === 0 && <p>The shelves are empty for now.</p>}
-        {items.map((item) => (
+      {items.length === 0 && (
+        <article className="panel">
+          <p>The shelves are empty for now.</p>
+        </article>
+      )}
+      {groupByLabel(items).map(({ label, items: group }) => (
+        <article className="panel" key={label.id}>
+          <h2>
+            {label.name} ({group.length})
+          </h2>
+          {group.map((item) => (
           <div className="item shopcard" key={item.id}>
             <Thumb item={item} />
             <div className="stack">
-              <h2 style={{ margin: 0 }}>{item.name}</h2>
+              <h3 style={{ margin: 0, fontFamily: "var(--head), Georgia, serif", fontWeight: 400, fontSize: "1.4rem" }}>{item.name}</h3>
               <p style={{ margin: 0 }}>
-                {item.label.name} · <span className="cap">{item.type}</span> · <strong>{item.price} Renown</strong>
+                <span className="cap">{item.type}</span> · <strong>{item.price} Renown</strong>
               </p>
               {item.description && <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{item.description}</p>}
-              {item.statSheet && (
-                <details>
-                  <summary>Stat sheet</summary>
-                  <p style={{ whiteSpace: "pre-wrap" }}>{item.statSheet}</p>
-                </details>
-              )}
               {item.links.length > 0 && (
                 <p style={{ margin: 0 }}>
                   <strong>Find it online:</strong>{" "}
@@ -112,8 +125,9 @@ function PlayerStore({ items }: { items: Item[] }) {
               )}
             </div>
           </div>
-        ))}
-      </article>
+          ))}
+        </article>
+      ))}
     </>
   );
 }
@@ -122,7 +136,7 @@ function PlayerStore({ items }: { items: Item[] }) {
 
 function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
   // Remount the edit form whenever saved values change so fields show what is saved.
-  const formKey = [item.name, item.description, item.price, item.type, item.labelId, item.image?.id ?? "", item.statSheet].join("|");
+  const formKey = [item.name, item.description, item.price, item.type, item.labelId, item.image?.id ?? ""].join("|");
 
   return (
     <details className="item">
@@ -175,10 +189,6 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
             )}
           </div>
 
-          <label>
-            Stat sheet
-            <textarea name="statSheet" rows={5} defaultValue={item.statSheet} />
-          </label>
           <div className="inline">
             <button type="submit">Save changes</button>
             <button type="reset">Cancel changes</button>
@@ -238,13 +248,22 @@ function AdminStore({ items, labels }: { items: Item[]; labels: Label[] }) {
         <p>Create and manage store items. Players see active items, including any source links you add.</p>
       </article>
 
-      <article className="panel">
-        <h2>Items ({active.length})</h2>
-        {active.length === 0 && <p>No items yet. Add your first one below.</p>}
-        {active.map((i) => (
-          <ItemRow key={i.id} item={i} labels={labels} />
-        ))}
-      </article>
+      {active.length === 0 && (
+        <article className="panel">
+          <h2>Items (0)</h2>
+          <p>No items yet. Add your first one below.</p>
+        </article>
+      )}
+      {groupByLabel(active).map(({ label, items: group }) => (
+        <article className="panel" key={label.id}>
+          <h2>
+            {label.name} ({group.length})
+          </h2>
+          {group.map((i) => (
+            <ItemRow key={i.id} item={i} labels={labels} />
+          ))}
+        </article>
+      ))}
 
       <article className="panel">
         <h2>Labels ({labels.length})</h2>
@@ -303,10 +322,6 @@ function AdminStore({ items, labels }: { items: Item[]; labels: Label[] }) {
           <label>
             Image (optional; PNG, JPEG, WebP or GIF, up to 2 MB)
             <input name="image" type="file" accept={IMAGE_ACCEPT} />
-          </label>
-          <label>
-            Stat sheet
-            <textarea name="statSheet" rows={5} placeholder="Abilities, charges, attunement, etc." />
           </label>
           <div className="grid2">
             <label>

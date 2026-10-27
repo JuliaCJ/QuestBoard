@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -14,10 +15,11 @@ model User {
   role          String        @default("player") // admin | player
   displayName   String
   hasPriority   Boolean       @default(false)
-  priorityUntil DateTime?     // set when a priority key is redeemed
-  renown        Int           @default(0)       // cached sum of Ledger
+  priorityUntil DateTime? // set when a priority key is redeemed
+  renown        Int           @default(0) // cached sum of Ledger
   isActive      Boolean       @default(true)
   createdAt     DateTime      @default(now())
+  ownedItems    OwnedItem[]
   signups       Signup[]
   ledger        Ledger[]
   keys          PriorityKey[]
@@ -50,6 +52,7 @@ model Signup {
   createdAt DateTime @default(now())
   quest     Quest    @relation(fields: [questId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
+
   @@unique([questId, userId])
 }
 
@@ -67,7 +70,7 @@ model Ledger {
   id        String   @id @default(cuid())
   userId    String
   amount    Int
-  reason    String   // quest | bonus | first_quest | admin_adjust | (later: purchase, achievement)
+  reason    String // quest | bonus | first_quest | admin_adjust | (later: purchase, achievement)
   note      String?
   questId   String?
   createdAt DateTime @default(now())
@@ -82,16 +85,16 @@ model ItemLabel {
 }
 
 model ShopItem {
-  id          String      @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
-  description String      @default("")
+  description String     @default("")
   price       Int
-  type        String      @default("consumable") // "consumable" | "equipable"
-  statSheet   String      @default("")
-  isActive    Boolean     @default(true)         // false = archived
-  createdAt   DateTime    @default(now())
+  type        String     @default("consumable") // "consumable" | "equipable"
+  statSheet   String     @default("")
+  isActive    Boolean    @default(true) // false = archived
+  createdAt   DateTime   @default(now())
   labelId     String
-  label       ItemLabel   @relation(fields: [labelId], references: [id], onDelete: Restrict)
+  label       ItemLabel  @relation(fields: [labelId], references: [id], onDelete: Restrict)
   links       ItemLink[]
   image       ItemImage?
 }
@@ -116,3 +119,15 @@ model ItemLink {
   @@index([itemId])
 }
 
+model OwnedItem {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  type        String    @default("consumable")
+  purchasedAt DateTime  @default(now())
+  usedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

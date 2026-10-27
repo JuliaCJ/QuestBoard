@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { doorState, fmt, priorityUnlocked } from "@/lib/util";
 import { redeemKey } from "@/app/actions";
 
-const LABEL = { locked: "Locked", priority: "Priority open", open: "Open", full: "Full", postponed: "Postponed" };
+const LABEL = { locked: "Locked", priority: "Priority Open", open: "Open", full: "Full", postponed: "Postponed" };
 
 export default async function Board() {
   const u = await requireUser();

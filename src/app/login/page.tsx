@@ -8,7 +8,7 @@ export default function Login() {
       <ActionForm action={login} className="stack">
         <label>Username<input name="username" autoCapitalize="none" autoComplete="username" required /></label>
         <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
-        <button>Enter the hallway</button>
+        <button>Enter the Hallway</button>
       </ActionForm>
     </div>
   );

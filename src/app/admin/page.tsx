@@ -1,3 +1,4 @@
+
 import ActionForm from "@/components/ActionForm";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -5,13 +6,16 @@ import { fmt, timeLeft } from "@/lib/util";
 import * as A from "@/app/actions";
 import PlayerEditor from "@/components/PlayerEditor";
 import ConfirmButton from "@/components/ConfirmButton";
+import PlayerPriorityControls from "@/components/PlayerPriorityControls";
 
 export default async function Admin() {
   await requireAdmin();
 
   // Expired keys are deleted permanently. Players keep any priority they already
   // got from a key (it is stored on the player, not on the key).
-  await db.priorityKey.deleteMany({ where: { expiresAt: { lte: new Date() } } });
+  await db.priorityKey.deleteMany({
+    where: { expiresAt: { lte: new Date() } },
+  });
 
   const [quests, players, keys] = await Promise.all([
     db.quest.findMany({
@@ -29,10 +33,7 @@ export default async function Admin() {
 
     db.user.findMany({
       where: { role: "player" },
-      orderBy: [
-        { isActive: "desc" },
-        { displayName: "asc" },
-      ],
+      orderBy: [{ isActive: "desc" }, { displayName: "asc" }],
     }),
 
     db.priorityKey.findMany({
@@ -53,80 +54,92 @@ export default async function Admin() {
 
   const now = new Date();
 
-  function renderPlayerList(list: typeof players) {
-    if (list.length === 0) {
-      return <p>No players in this section.</p>;
-    }
+  
+function renderPlayerList(list: typeof players) {
+  if (list.length === 0) {
+    return <p>No players in this section.</p>;
+  }
 
-    return list.map((p) => {
-      const priority =
-        p.hasPriority ||
-        (!!p.priorityUntil && p.priorityUntil > now);
+  return list.map((p) => {
+    const priority =
+      p.hasPriority ||
+      (!!p.priorityUntil && p.priorityUntil > now);
 
-      return (
+    return (
+      <div
+        className="stack"
+        key={p.id}
+        style={{
+          borderTop: "1px solid #0002",
+          paddingTop: ".6rem",
+          marginTop: ".6rem",
+        }}
+      >
         <div
-          className="stack"
-          key={p.id}
           style={{
-            borderTop: "1px solid #0002",
-            paddingTop: ".6rem",
-            marginTop: ".6rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+            flexWrap: "wrap",
           }}
         >
-          <div className="row" style={{ border: 0, padding: 0 }}>
-            <span>
-              <strong>{p.displayName}</strong> ({p.username})
-              {" · "}{p.renown} Renown
-              {priority ? " · priority" : ""}
-              {p.priorityUntil && !p.hasPriority
-                ? ` until ${fmt(p.priorityUntil)}`
-                : ""}
-            </span>
+          <span>
+            <strong>{p.displayName}</strong> ({p.username})
+            {" · "}{p.renown} Renown
+            {priority ? " · Priority" : ""}
+            {p.priorityUntil && !p.hasPriority
+              ? ` until ${fmt(p.priorityUntil)}`
+              : ""}
+          </span>
 
-            <span className="inline">
-              {p.isActive ? (
-                <ActionForm action={A.setPriority} className="inline">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              flexWrap: "wrap",
+            }}
+          >
+            {p.isActive ? (
+              <>
+                <PlayerEditor userId={p.id} />
+
+                <PlayerPriorityControls
+                  userId={p.id}
+                  hasPriority={priority}
+                  setPriorityAction={A.setPriority}
+                  deactivateAction={A.deactivate}
+                />
+
+                <ActionForm action={A.deletePlayer} className="inline">
                   <input type="hidden" name="userId" value={p.id} />
-                  <input
-                    type="hidden"
-                    name="value"
-                    value={p.hasPriority ? "0" : "1"}
-                  />
-                  <button>
-                    {p.hasPriority ? "Remove priority" : "Grant priority"}
-                  </button>
+                  <button type="submit">Delete Player</button>
                 </ActionForm>
-              ) : (
+              </>
+            ) : (
+              <>
                 <ActionForm
                   action={A.reactivatePlayer}
                   className="inline"
                 >
                   <input type="hidden" name="userId" value={p.id} />
-                  <button>Reactivate player</button>
+                  <button type="submit">Reactivate Player</button>
                 </ActionForm>
-              )}
 
-              {p.isActive && (
-                <ActionForm action={A.deactivate} className="inline">
+                <ActionForm action={A.deletePlayer} className="inline">
                   <input type="hidden" name="userId" value={p.id} />
-                  <button>Remove player</button>
+                  <button type="submit">Delete Player</button>
                 </ActionForm>
-              )}
-            </span>
+              </>
+            )}
           </div>
-
-          <div className="inline">
-  {p.isActive && <PlayerEditor userId={p.id} />}
-
-  <ActionForm action={A.deletePlayer} className="inline">
-    <input type="hidden" name="userId" value={p.id} />
-    <button>Delete</button>
-  </ActionForm>
-</div>
         </div>
-      );
-    });
-  }
+      </div>
+    );
+  });
+}
+
 
   return (
     <>
@@ -155,7 +168,11 @@ export default async function Admin() {
 
           <label>
             Username
-            <input name="username" required autoComplete="off" />
+            <input
+              name="username"
+              required
+              autoComplete="off"
+            />
           </label>
 
           <label>
@@ -179,7 +196,7 @@ export default async function Admin() {
             />
           </label>
 
-          <button>Create Player</button>
+          <button type="submit">Create Player</button>
         </ActionForm>
       </article>
 
@@ -193,6 +210,7 @@ export default async function Admin() {
             autoComplete="off"
             required
           />
+
           <input
             name="days"
             type="number"
@@ -200,23 +218,25 @@ export default async function Admin() {
             defaultValue={5}
             aria-label="Days valid"
           />
-          <button>Create key</button>
+
+          <button type="submit">Create key</button>
         </ActionForm>
 
-        <h3>Active keys ({keys.length})</h3>
+        <h3>Active Keys ({keys.length})</h3>
         {keys.length === 0 && <p>No active keys.</p>}
 
         {keys.map((k) => (
           <div className="row" key={k.id}>
             <span>
               <strong>{k.code}</strong>
-              {" "}· {timeLeft(k.expiresAt, now)} left
+              {" "}· {timeLeft(k.expiresAt, now)} Left
               {" "}<small>(until {fmt(k.expiresAt)})</small>
             </span>
 
             <span className="inline">
               <ActionForm action={A.extendKey} className="inline">
                 <input type="hidden" name="keyId" value={k.id} />
+
                 <input
                   name="days"
                   type="number"
@@ -225,12 +245,16 @@ export default async function Admin() {
                   defaultValue={1}
                   aria-label={`Days to add to ${k.code}`}
                 />
-                <button>Add days</button>
+
+                <button type="submit">Add days</button>
               </ActionForm>
 
               <ActionForm action={A.deleteKey} className="inline">
                 <input type="hidden" name="keyId" value={k.id} />
-                <ConfirmButton message={`Delete key "${k.code}"? It will stop working immediately.`}>
+
+                <ConfirmButton
+                  message={`Delete key "${k.code}"? It will stop working immediately.`}
+                >
                   Delete
                 </ConfirmButton>
               </ActionForm>

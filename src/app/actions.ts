@@ -23,6 +23,7 @@ import {
   zonedToUtc,
 } from "@/lib/util";
 
+
 type R = Promise<string | void>;
 
 const s = (fd: FormData, k: string) =>
@@ -348,18 +349,28 @@ export async function resetPassword(fd: FormData): R {
   return "Password updated. Share the new password with the player.";
 }
 
-export async function setPriority(fd: FormData): R {
+
+export async function setPriority(fd: FormData) {
   await requireAdmin();
 
+  const userId = s(fd, "userId");
+  const value = s(fd, "value") === "1";
+
   await db.user.update({
-    where: { id: s(fd, "userId") },
-    data: {
-      hasPriority: s(fd, "value") === "1",
-    },
+    where: { id: userId },
+    data: value
+      ? {
+          hasPriority: true,
+        }
+      : {
+          hasPriority: false,
+          priorityUntil: null,
+        },
   });
 
-  return done("Priority updated.");
+  revalidatePath("/admin");
 }
+
 
 export async function deactivate(fd: FormData): R {
   await requireAdmin();

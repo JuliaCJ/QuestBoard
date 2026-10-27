@@ -81,7 +81,7 @@ export default async function Account() {
         <h2>Upcoming Quests ({upcoming.length})</h2>
         {upcoming.length === 0 && (
           <p>
-            You&apos;re not signed up for any quests. <Link href="/">Browse the Quest Board</Link>.
+            You&apos;re not signed up for any quests. <Link href="/">Browse the QuestBoard</Link>.
           </p>
         )}
         {upcoming.map((su) => (

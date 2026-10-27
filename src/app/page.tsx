@@ -19,7 +19,7 @@ export default async function Board() {
   return (
     <>
       <section className="hall" aria-label="Quests">
-        {quests.length === 0 && <p className="empty">The hallway is quiet. No quests are posted yet.</p>}
+        {quests.length === 0 && <p className="empty">The Hallway is quiet. No quests are posted yet.</p>}
         {quests.map((q) => {
           const rawSt = doorState(q, q._count.signups, hp, now);
           // Priority holders (or key redeemers) see locked quests as unlocked for them.

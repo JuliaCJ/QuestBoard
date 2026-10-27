@@ -163,10 +163,6 @@ export default async function QuestPortal() {
       {isAdmin && (
         <article className="panel">
           <h2>Draft Quests</h2>
-          <p>
-            Drafts are visible only to administrators. Use Post Now to
-            publish a draft and start priority sign-ups immediately.
-          </p>
 
           {draftQuests.length === 0 && <p>No saved drafts.</p>}
 
@@ -199,10 +195,6 @@ export default async function QuestPortal() {
       {isAdmin && (
         <article className="panel">
           <h2>Past Quests</h2>
-          <p>
-            Completed quests are archived here.
-            Open a quest to review its details and player history.
-          </p>
 
           {pastQuests.length === 0 && <p>No past quests yet.</p>}
 
@@ -277,7 +269,7 @@ export default async function QuestPortal() {
                   name="renown"
                   type="number"
                   min={0}
-                  defaultValue={0}
+                  defaultValue={500}
                   required
                   style={{
                     width: "100%",

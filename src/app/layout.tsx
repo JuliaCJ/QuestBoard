@@ -20,7 +20,7 @@ export default async function Root({ children }: { children: React.ReactNode }) 
         {u && (
           <header className="bar">
             {u.role !== "admin" && <><Link href="/account">My Account</Link>{" | "}</>}
-            <Link href="/">Quest Board</Link> { " | "}
+            <Link href="/">QuestBoard</Link> { " | "}
             {u.role === "admin" && <><Link href="/admin">Player Portal</Link>{" | "}</>}
             {u.role === "admin" && <><Link href="/quest">Quest Portal</Link>{" | "}</>}
             {u.role === "admin" && <><Link href="/store">Store Page</Link>{" | "}</>}

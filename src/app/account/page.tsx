@@ -94,7 +94,7 @@ export default async function Account() {
               <br />
               <small>{fmt(su.quest.oneShotDate)}</small>
             </span>
-            <span>{su.quest.status === "postponed" ? "Postponed" : `${su.quest.renownReward} Renown reward`}</span>
+            <span>{su.quest.status === "postponed" ? "Postponed" : `${su.quest.renownReward} Renown Reward`}</span>
           </div>
         ))}
       </article>

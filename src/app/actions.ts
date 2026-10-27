@@ -1362,7 +1362,7 @@ export async function updateItem(fd: FormData): R {
       });
     }
 
-    return "Item updated.";
+    return "Item Updated.";
   });
 
   return done(msg);

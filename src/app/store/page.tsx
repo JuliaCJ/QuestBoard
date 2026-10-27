@@ -112,7 +112,7 @@ function PlayerStore({ items }: { items: Item[] }) {
               {item.description && <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{item.description}</p>}
               {item.links.length > 0 && (
                 <p style={{ margin: 0 }}>
-                  <strong>Find it online:</strong>{" "}
+                  <strong>Find it Online:</strong>{" "}
                   {item.links.map((l, i) => (
                     <span key={l.id}>
                       {i > 0 && " · "}
@@ -145,7 +145,7 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
         <strong>{item.name}</strong>
         <span>
           · {item.label.name} · <span className="cap">{item.type}</span> · {item.price} Renown
-          {item.links.length > 0 ? ` · ${item.links.length} source link${item.links.length === 1 ? "" : "s"}` : ""}
+          {item.links.length > 0 ? ` · ${item.links.length} Source Link${item.links.length === 1 ? "" : "s"}` : ""}
         </span>
       </summary>
 
@@ -158,7 +158,7 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
           </label>
           <label>
             Description
-            <textarea name="description" rows={2} defaultValue={item.description} />
+            <textarea name="description" rows={10} defaultValue={item.description} />
           </label>
           <div className="grid2">
             <label>
@@ -178,12 +178,12 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
           <div className="stack">
             {item.image && <Thumb item={item} />}
             <label>
-              {item.image ? "Replace image" : "Image"} (PNG, JPEG, WebP or GIF, up to 2 MB)
+              {item.image ? "Replace Image" : "Image"} (PNG, JPEG, WebP or GIF, up to 2 MB)
               <input name="image" type="file" accept={IMAGE_ACCEPT} />
             </label>
             {item.image && (
               <label className="checkbox-label">
-                Remove current image
+                Remove Current Image
                 <input name="removeImage" type="checkbox" className="small-checkbox" />
               </label>
             )}
@@ -197,7 +197,7 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
 
         {/* ---------- Source links (separate forms: HTML can't nest forms) ---------- */}
         <div className="stack">
-          <h3 style={{ margin: 0 }}>Source links (visible to players)</h3>
+          <h3 style={{ margin: 0 }}>Source Links (Visible to Players)</h3>
           {item.links.length === 0 && <p style={{ margin: 0 }}>No source links yet.</p>}
           {item.links.map((l) => (
             <ActionForm key={l.id} action={A.removeItemLink} className="row">
@@ -208,14 +208,14 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
                 <small>({host(l.url)})</small>
               </span>
               <input type="hidden" name="linkId" value={l.id} />
-              <button>Remove link</button>
+              <button>Remove Link</button>
             </ActionForm>
           ))}
           <ActionForm action={A.addItemLink} className="inline">
             <input type="hidden" name="itemId" value={item.id} />
             <input name="label" placeholder="Label (e.g. D&D Beyond)" aria-label="Link label" maxLength={60} />
             <input name="url" placeholder="https://..." aria-label="Link address" required />
-            <button>Add link</button>
+            <button>Add Link</button>
           </ActionForm>
         </div>
 
@@ -223,11 +223,11 @@ function ItemRow({ item, labels }: { item: Item; labels: Label[] }) {
           <ActionForm action={A.setItemActive} className="inline">
             <input type="hidden" name="itemId" value={item.id} />
             <input type="hidden" name="value" value={item.isActive ? "0" : "1"} />
-            <button>{item.isActive ? "Archive (hide from store)" : "Restore to store"}</button>
+            <button>{item.isActive ? "Archive (Hide from Store)" : "Restore to Store"}</button>
           </ActionForm>
           <ActionForm action={A.deleteItem} className="inline">
             <input type="hidden" name="itemId" value={item.id} />
-            <ConfirmButton message={`Permanently delete "${item.name}"? This also removes its image and source links, and can't be undone.`}>
+            <ConfirmButton message={`Permanently Delete "${item.name}"? This also removes its image and source links, and can't be undone.`}>
               Delete permanently
             </ConfirmButton>
           </ActionForm>
@@ -302,7 +302,7 @@ function AdminStore({ items, labels }: { items: Item[]; labels: Label[] }) {
           </label>
           <label>
             Description
-            <textarea name="description" rows={2} />
+            <textarea name="description" rows={10} />
           </label>
           <div className="grid2">
             <label>
@@ -325,11 +325,11 @@ function AdminStore({ items, labels }: { items: Item[]; labels: Label[] }) {
           </label>
           <div className="grid2">
             <label>
-              Source link label (optional)
+              Source Link Label (optional)
               <input name="linkLabel" placeholder="e.g. D&D Beyond" maxLength={60} />
             </label>
             <label>
-              Source link address (optional)
+              Source Link Address (optional)
               <input name="linkUrl" placeholder="https://..." />
             </label>
           </div>

@@ -351,7 +351,7 @@ export default async function QuestPortalDetails({
             </p>
 
             <p>
-              <strong>One-shot date:</strong> {fmt(q.oneShotDate)}
+              <strong>One-Shot Date:</strong> {fmt(q.oneShotDate)}
             </p>
 
             <p>

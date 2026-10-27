@@ -88,7 +88,7 @@ function PlayerStore({ items }: { items: Item[] }) {
     <>
       <article className="panel">
         <h1>Renown Store</h1>
-        <p>Items you can spend Renown on. Purchasing is coming soon.</p>
+        <p>Items you can spend Renown on.</p>
       </article>
 
       {items.length === 0 && (

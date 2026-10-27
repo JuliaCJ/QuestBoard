@@ -41,7 +41,7 @@ export default async function Board() {
       </section>
       <ActionForm action={redeemKey} className="keybox">
         <label>Have a priority key?<input name="code" placeholder="Enter your code" autoComplete="off" /></label>
-        <button>Redeem key</button>
+        <button>Redeem Key</button>
       </ActionForm>
     </>
   );

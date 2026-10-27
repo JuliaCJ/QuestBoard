@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { COOKIE, requireAdmin, requireUser, startSession } from "@/lib/auth";
-import { CLASSES, DAY, FIRST_QUEST_BONUS, ITEM_TYPES, PRIORITY_WINDOW_DAYS, TZ, doorState, fmt, zonedToUtc } from "@/lib/util";
+import { CLASSES, DAY, FIRST_QUEST_BONUS, ITEM_TYPES, PRIORITY_WINDOW_DAYS, TZ, doorState, fmt, priorityUnlocked, zonedToUtc } from "@/lib/util";
 
 type R = Promise<string | void>;
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -91,7 +91,9 @@ export async function signUp(fd: FormData): R {
     }
     const count = await tx.signup.count({ where: { questId, status: "signed_up" } });
     const st = doorState(q, count, hasPriority(u));
-    if (q.postAt > new Date() || (st !== "open" && st !== "priority")) return "Sign-ups aren't open to you for this quest.";
+    // Players with priority (or a redeemed key) may join locked quests that still have room.
+    const unlocked = priorityUnlocked(q, st, count, hasPriority(u));
+    if (q.postAt > new Date() || (st !== "open" && st !== "priority" && !unlocked)) return "Sign-ups aren't open to you for this quest.";
     if (existing) await tx.signup.update({ where: { id: existing.id }, data: { status: "signed_up", className: cls } });
     else await tx.signup.create({ data: { questId, userId: u.id, className: cls } });
     return "You're signed up.";
@@ -257,6 +259,7 @@ export async function createQuest(fd: FormData): R {
   return done(`Created "${q.title}".`);
 }
 
+
 export async function setLock(fd: FormData): R {
   await requireAdmin();
 
@@ -306,22 +309,31 @@ export async function rescheduleQuest(fd: FormData): R {
   return done("One-shot date updated.");
 }
 
+
 export async function postNow(fd: FormData): R {
   await requireAdmin();
 
+  const questId = s(fd, "questId");
   const now = new Date();
+
   const result = await db.quest.updateMany({
     where: {
-      id: s(fd, "questId"),
+      id: questId,
       status: { in: ["active", "postponed"] },
-      postAt: { gt: now },
     },
-    data: { postAt: now },
+    data: {
+      postAt: now,
+      prioritySignupAt: now,
+    },
   });
 
-  if (!result.count) return "Quest not found, or it is already on the board.";
-  return done("Quest posted to the board.");
+  if (!result.count) {
+    return "Quest not found or cannot be posted.";
+  }
+
+  return done("Quest posted! Priority sign-ups are now open.");
 }
+
 
 export async function deferQuest(fd: FormData): R {
   await requireAdmin();
@@ -549,12 +561,15 @@ export async function completeQuest(fd: FormData): R {
     for (const su of q.signups) {
       if (noShow.has(su.userId)) { await tx.signup.update({ where: { id: su.id }, data: { status: "no_show" } }); continue; }
       const first = (await tx.signup.count({ where: { userId: su.userId, status: "completed" } })) === 0;
-      const bonus = Math.max(0, parseInt(s(fd, `bonus_${su.userId}`), 10) || 0);
-      const rows = [
-        { amount: q.renownReward, reason: "quest" },
-        { amount: bonus, reason: "bonus" },
-        { amount: first ? FIRST_QUEST_BONUS : 0, reason: "first_quest" },
-      ].filter((r) => r.amount > 0);
+      const bonus = Math.max(
+  0,
+  parseInt(s(fd, `bonus_${su.userId}`), 10) || 0
+);
+
+const rows = [
+  { amount: q.renownReward, reason: "quest" },
+  { amount: bonus, reason: "bonus" },
+].filter((r) => r.amount > 0);
       for (const r of rows) await tx.ledger.create({ data: { userId: su.userId, questId, ...r } });
       const total = rows.reduce((t, r) => t + r.amount, 0);
       if (total) await tx.user.update({ where: { id: su.userId }, data: { renown: { increment: total } } });

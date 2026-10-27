@@ -48,3 +48,12 @@ export function doorState(
   if (now >= q.prioritySignupAt && hasPriority) return "priority";
   return "locked";
 }
+
+// A player with priority (or a redeemed key) can get into a quest that is "locked" only because
+// sign-ups haven't opened yet. An admin's manual lock still blocks everyone.
+export function priorityUnlocked(
+  q: { status: string; manualLock: boolean; maxPlayers: number },
+  st: DoorState, count: number, hasPriority: boolean
+): boolean {
+  return hasPriority && st === "locked" && !q.manualLock && q.status === "active" && count < q.maxPlayers;
+}

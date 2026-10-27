@@ -32,6 +32,8 @@ export default async function QuestPortal() {
     },
   });
 
+  const draftQuests = quests.filter((q) => q.status === "draft");
+
   const currentQuests = quests.filter(
     (q) => q.status === "active" || q.status === "postponed"
   );
@@ -40,19 +42,12 @@ export default async function QuestPortal() {
     (q) => q.status === "cancelled" || q.status === "completed"
   );
 
-  // Default priority and post dates to the next noon.
-  const priorityDate = new Date(now);
-  priorityDate.setHours(12, 0, 0, 0);
-
-  if (now >= priorityDate) {
-    priorityDate.setDate(priorityDate.getDate() + 1);
-  }
-
-  // General sign-ups open five days after priority sign-ups.
-  const generalDate = new Date(priorityDate);
+  // General sign-ups default to noon, five days from today.
+  const generalDate = new Date(now);
   generalDate.setDate(generalDate.getDate() + 5);
+  generalDate.setHours(12, 0, 0, 0);
 
-  // Default the one-shot to one day after general sign-ups open.
+  // Default the one-shot date to one day after general sign-ups open.
   const oneShotDate = new Date(generalDate);
   oneShotDate.setDate(oneShotDate.getDate() + 1);
 
@@ -85,7 +80,6 @@ export default async function QuestPortal() {
 
             {isAdmin && (
               <span className="inline">
-                {/* Always show Post Now to administrators. */}
                 <ActionForm action={A.postNow} className="inline">
                   <input type="hidden" name="questId" value={q.id} />
                   <button type="submit">Post Now</button>
@@ -167,6 +161,42 @@ export default async function QuestPortal() {
 
       {isAdmin && (
         <article className="panel">
+          <h2>Draft Quests</h2>
+          <p>
+            Drafts are visible only to administrators. Use Post Now to
+            publish a draft and start priority sign-ups immediately.
+          </p>
+
+          {draftQuests.length === 0 && <p>No saved drafts.</p>}
+
+          {draftQuests.map((q) => (
+            <div className="row" key={q.id}>
+              <span>
+                <Link href={`/quest/${q.id}`}>
+                  <strong>{q.title}</strong>
+                </Link>
+                {" "}· Draft
+                {" "}· {fmt(q.oneShotDate)}
+              </span>
+
+              <span className="inline">
+                <ActionForm action={A.postNow} className="inline">
+                  <input type="hidden" name="questId" value={q.id} />
+                  <button type="submit">Post Now</button>
+                </ActionForm>
+
+                <ActionForm action={A.cancelQuest} className="inline">
+                  <input type="hidden" name="questId" value={q.id} />
+                  <button type="submit">Delete Permanently</button>
+                </ActionForm>
+              </span>
+            </div>
+          ))}
+        </article>
+      )}
+
+      {isAdmin && (
+        <article className="panel">
           <h2>Past Quests</h2>
           <p>
             Completed quests are archived here.
@@ -223,6 +253,7 @@ export default async function QuestPortal() {
                   type="number"
                   min={1}
                   defaultValue={1}
+                  required
                 />
               </label>
 
@@ -233,6 +264,7 @@ export default async function QuestPortal() {
                   type="number"
                   min={0}
                   defaultValue={0}
+                  required
                 />
               </label>
 
@@ -243,6 +275,7 @@ export default async function QuestPortal() {
                   type="number"
                   min={1}
                   defaultValue={3}
+                  required
                 />
               </label>
 
@@ -253,21 +286,12 @@ export default async function QuestPortal() {
                   type="number"
                   min={1}
                   defaultValue={6}
+                  required
                 />
               </label>
             </div>
 
             <div className="grid2">
-              <label>
-                Priority Sign-Up Opens
-                <input
-                  name="priority"
-                  type="datetime-local"
-                  required
-                  defaultValue={toLocalInput(priorityDate)}
-                />
-              </label>
-
               <label>
                 General Sign-Up Opens
                 <input
@@ -287,19 +311,25 @@ export default async function QuestPortal() {
                   defaultValue={toLocalInput(oneShotDate)}
                 />
               </label>
-
-              <label>
-                Post At
-                <input
-                  name="post"
-                  type="datetime-local"
-                  required
-                  defaultValue={toLocalInput(priorityDate)}
-                />
-              </label>
             </div>
 
-            <button type="submit">Create Quest</button>
+            <p>
+              <strong>Save Draft:</strong> Save without publishing the quest.
+              <br />
+              <strong>Post Now:</strong> Publish immediately and begin
+              priority sign-ups immediately. General sign-ups remain
+              scheduled for the date above.
+            </p>
+
+            <div className="inline">
+              <button type="submit" name="intent" value="draft">
+                Save Draft
+              </button>
+
+              <button type="submit" name="intent" value="postNow">
+                Post Now
+              </button>
+            </div>
           </ActionForm>
         </article>
       )}

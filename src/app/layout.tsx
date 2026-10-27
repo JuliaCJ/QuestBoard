@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { IM_Fell_English, Alegreya_Sans } from "next/font/google";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
-import { logout } from "./actions";
+import { logout } from "@/app/actions";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next"
 

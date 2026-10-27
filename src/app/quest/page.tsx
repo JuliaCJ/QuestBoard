@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
 import { requireUser } from "@/lib/auth";
@@ -59,7 +60,7 @@ export default async function QuestPortal() {
       </article>
 
       <article className="panel">
-        <h2>Quests</h2>
+        <h2>Active Quests</h2>
 
         {currentQuests.length === 0 && (
           <p>No active or deferred quests.</p>
@@ -82,7 +83,7 @@ export default async function QuestPortal() {
               <span className="inline">
                 <ActionForm action={A.postNow} className="inline">
                   <input type="hidden" name="questId" value={q.id} />
-                  <button type="submit">Post Now</button>
+                
                 </ActionForm>
 
                 <ActionForm action={A.setLock} className="inline">
@@ -245,7 +246,16 @@ export default async function QuestPortal() {
               <textarea name="description" rows={3} />
             </label>
 
-            <div className="grid2">
+            {/* Three equal-width columns for Level, Renown Reward,
+                and Total Players. */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: "5rem",
+                alignItems: "end",
+              }}
+            >
               <label>
                 Level
                 <input
@@ -254,6 +264,10 @@ export default async function QuestPortal() {
                   min={1}
                   defaultValue={1}
                   required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
                 />
               </label>
 
@@ -265,30 +279,63 @@ export default async function QuestPortal() {
                   min={0}
                   defaultValue={0}
                   required
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
                 />
               </label>
 
-              <label>
-                Min Players
-                <input
-                  name="min"
-                  type="number"
-                  min={1}
-                  defaultValue={3}
-                  required
-                />
-              </label>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    marginBottom: "0.4rem",
+                  }}
+                >
+                  Total Players
+                </label>
 
-              <label>
-                Max Players
-                <input
-                  name="max"
-                  type="number"
-                  min={1}
-                  defaultValue={6}
-                  required
-                />
-              </label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.4rem",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <input
+                    name="min"
+                    type="number"
+                    min={1}
+                    defaultValue={3}
+                    required
+                    aria-label="Minimum players"
+                    style={{
+                      width: "3.5rem",
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                    }}
+                  />
+
+                  <span>–</span>
+
+                  <input
+                    name="max"
+                    type="number"
+                    min={1}
+                    defaultValue={6}
+                    required
+                    aria-label="Maximum players"
+                    style={{
+                      width: "3.5rem",
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid2">
@@ -313,13 +360,6 @@ export default async function QuestPortal() {
               </label>
             </div>
 
-            <p>
-              <strong>Save Draft:</strong> Save without publishing the quest.
-              <br />
-              <strong>Post Now:</strong> Publish immediately and begin
-              priority sign-ups immediately. General sign-ups remain
-              scheduled for the date above.
-            </p>
 
             <div className="inline">
               <button type="submit" name="intent" value="draft">
@@ -336,3 +376,4 @@ export default async function QuestPortal() {
     </>
   );
 }
+

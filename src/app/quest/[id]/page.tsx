@@ -41,7 +41,7 @@ export default async function QuestPortalDetails({
       signups: {
         where: isAdmin
           ? {}
-          : { status: { in: ["signed_up", "completed", "no_show"] } },
+          : { status: { in: ["Signed Up", "Completed", "No Show"] } },
         include: { user: true },
         orderBy: { createdAt: "asc" },
       },
@@ -161,11 +161,15 @@ export default async function QuestPortalDetails({
               <ActionForm action={A.postNow} className="inline">
                 <input type="hidden" name="questId" value={q.id} />
                 {isDraft ? (
-                  <span>This quest is a draft and is not visible to players.</span>
+                  <span>
+                    This quest is a draft and is not visible to players.
+                  </span>
                 ) : q.postAt > now ? (
                   <span>Scheduled to post {fmt(q.postAt)}.</span>
                 ) : (
-                  <span>Publish this quest and reopen priority access.</span>
+                  <span>
+                    Publish this quest and reopen priority access.
+                  </span>
                 )}
                 <button type="submit">Post now</button>
               </ActionForm>
@@ -192,7 +196,15 @@ export default async function QuestPortalDetails({
                 />
               </label>
 
-              <div className="grid2">
+              {/* Match the three-column layout on the Quest Portal. */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "5rem",
+                  alignItems: "end",
+                }}
+              >
                 <label>
                   Level
                   <input
@@ -201,41 +213,78 @@ export default async function QuestPortalDetails({
                     min={1}
                     defaultValue={q.level}
                     required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                    }}
                   />
                 </label>
 
                 <label>
-                  Renown reward
+                  Renown Reward
                   <input
                     name="renown"
                     type="number"
                     min={0}
                     defaultValue={q.renownReward}
                     required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                    }}
                   />
                 </label>
 
-                <label>
-                  Min players
-                  <input
-                    name="min"
-                    type="number"
-                    min={1}
-                    defaultValue={q.minPlayers}
-                    required
-                  />
-                </label>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      marginBottom: "0.4rem",
+                    }}
+                  >
+                    Total Players
+                  </label>
 
-                <label>
-                  Max players
-                  <input
-                    name="max"
-                    type="number"
-                    min={1}
-                    defaultValue={q.maxPlayers}
-                    required
-                  />
-                </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.4rem",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <input
+                      name="min"
+                      type="number"
+                      min={1}
+                      defaultValue={q.minPlayers}
+                      required
+                      aria-label="Minimum players"
+                      style={{
+                        width: "3.5rem",
+                        textAlign: "center",
+                        boxSizing: "border-box",
+                      }}
+                    />
+
+                    <span>–</span>
+
+                    <input
+                      name="max"
+                      type="number"
+                      min={1}
+                      defaultValue={q.maxPlayers}
+                      required
+                      aria-label="Maximum players"
+                      style={{
+                        width: "3.5rem",
+                        textAlign: "center",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="grid2">

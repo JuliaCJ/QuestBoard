@@ -297,6 +297,58 @@ export async function redeemKey(fd: FormData): R {
 
 const USERNAME_RE = /^[a-z0-9._-]{3,24}$/;
 
+export async function resetPlayer(fd: FormData): R {
+  await requireAdmin();
+
+  const userId = s(fd, "userId");
+
+  if (!userId) {
+    return "Missing player ID.";
+  }
+
+  const msg = await db.$transaction(async (tx) => {
+    const player = await tx.user.findFirst({
+      where: {
+        id: userId,
+        role: "player",
+      },
+      select: {
+        id: true,
+        username: true,
+      },
+    });
+
+    if (!player) {
+      return "Player not found.";
+    }
+
+    // Remove all of the player's inventory items.
+    await tx.ownedItem.deleteMany({
+      where: { userId: player.id },
+    });
+
+    // Remove all quest sign-ups, including historical sign-ups.
+    await tx.signup.deleteMany({
+      where: { userId: player.id },
+    });
+
+    // Remove all Renown transaction history.
+    await tx.ledger.deleteMany({
+      where: { userId: player.id },
+    });
+
+    // Reset the player's Renown balance.
+    await tx.user.update({
+      where: { id: player.id },
+      data: { renown: 0 },
+    });
+
+    return `Player "${player.username}" has been reset.`;
+  });
+
+  return done(msg);
+}
+
 export async function createPlayer(fd: FormData): R {
   await requireAdmin();
 

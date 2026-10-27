@@ -7,6 +7,8 @@ import * as A from "@/app/actions";
 import PlayerEditor from "@/components/PlayerEditor";
 import ConfirmButton from "@/components/ConfirmButton";
 import PlayerPriorityControls from "@/components/PlayerPriorityControls";
+import PlayerActionsRow from "@/components/PlayerActionsRow";
+
 
 export default async function Admin() {
   await requireAdmin();
@@ -55,6 +57,8 @@ export default async function Admin() {
   const now = new Date();
 
   
+
+
 function renderPlayerList(list: typeof players) {
   if (list.length === 0) {
     return <p>No players in this section.</p>;
@@ -96,33 +100,53 @@ function renderPlayerList(list: typeof players) {
           }}
         >
           {p.isActive ? (
-            <>
-              <PlayerEditor userId={p.id} />
+  
+  <PlayerActionsRow
+    userId={p.id}
+    hasPriority={priority}
+  />
 
-              <PlayerPriorityControls
-                userId={p.id}
-                hasPriority={priority}
-                setPriorityAction={A.setPriority}
-                deactivateAction={A.deactivate}
-              />
-
-              <ActionForm action={A.deletePlayer} className="inline">
-                <input type="hidden" name="userId" value={p.id} />
-                <button type="submit">Delete Player</button>
-              </ActionForm>
-            </>
           ) : (
             <>
               <ActionForm
                 action={A.reactivatePlayer}
                 className="inline"
               >
-                <input type="hidden" name="userId" value={p.id} />
-                <button type="submit">Reactivate Player</button>
+                <input
+                  type="hidden"
+                  name="userId"
+                  value={p.id}
+                />
+                <button type="submit">
+                  Reactivate Player
+                </button>
               </ActionForm>
 
-              <ActionForm action={A.deletePlayer} className="inline">
-                <input type="hidden" name="userId" value={p.id} />
+              <ActionForm
+                action={A.resetPlayer}
+                className="inline"
+              >
+                <input
+                  type="hidden"
+                  name="userId"
+                  value={p.id}
+                />
+                <ConfirmButton
+                  message={`Reset "${p.displayName}"? This permanently deletes all inventory items, quest history, and Renown history, and sets Renown to zero. This cannot be undone.`}
+                >
+                  Reset Player
+                </ConfirmButton>
+              </ActionForm>
+
+              <ActionForm
+                action={A.deletePlayer}
+                className="inline"
+              >
+                <input
+                  type="hidden"
+                  name="userId"
+                  value={p.id}
+                />
                 <button type="submit">Delete Player</button>
               </ActionForm>
             </>
@@ -132,6 +156,7 @@ function renderPlayerList(list: typeof players) {
     );
   });
 }
+
 
 
   return (

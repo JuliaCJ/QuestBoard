@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 type Action = (fd: FormData) => Promise<unknown>;
 
@@ -9,11 +9,13 @@ export default function ActionForm({
   className,
   children,
   messageBelow = true,
+  onMessage,
 }: {
   action: Action;
   className?: string;
   children: React.ReactNode;
   messageBelow?: boolean;
+  onMessage?: (message: string) => void;
 }) {
   const [msg, run] = useActionState(
     async (_: string, fd: FormData): Promise<string> => {
@@ -23,8 +25,12 @@ export default function ActionForm({
     ""
   );
 
+  useEffect(() => {
+    if (msg) onMessage?.(msg);
+  }, [msg, onMessage]);
+
   return (
-    <div>
+    <>
       <form action={run} className={className}>
         {children}
       </form>
@@ -34,6 +40,6 @@ export default function ActionForm({
           {msg}
         </p>
       )}
-    </div>
+    </>
   );
 }

@@ -976,11 +976,52 @@ export async function removeFromQuest(fd: FormData): R {
   return done("Player removed from quest.");
 }
 
+export async function updateSignupClass(fd: FormData): R {
+  const currentUser = await requireUser();
+
+  const questId = s(fd, "questId");
+  const userId = s(fd, "userId");
+  const className = s(fd, "className");
+
+  if (!questId || !userId) {
+    return "Missing quest or player ID.";
+  }
+
+  if (!CLASSES.includes(className)) {
+    return "Pick a valid class.";
+  }
+
+  // Players may only change their own class.
+  // Admins may change any signed-up player's class.
+  if (
+    currentUser.role !== "admin" &&
+    currentUser.id !== userId
+  ) {
+    return "You aren't allowed to change this player's class.";
+  }
+
+  const result = await db.signup.updateMany({
+    where: {
+      questId,
+      userId,
+      status: "signed_up",
+    },
+    data: {
+      className,
+    },
+  });
+
+  if (!result.count) {
+    return "Active signup not found. Refresh the page and try again.";
+  }
+
+  return done("Player class updated.");
+}
+
 export async function completeQuest(fd: FormData): R {
   await requireAdmin();
 
   const questId = s(fd, "questId");
-  const noShow = new Set(fd.getAll("noshow").map(String));
 
   const msg = await db.$transaction(async (tx) => {
     await tx.$queryRaw`
@@ -1003,15 +1044,6 @@ export async function completeQuest(fd: FormData): R {
     }
 
     for (const su of q.signups) {
-      if (noShow.has(su.userId)) {
-        await tx.signup.update({
-          where: { id: su.id },
-          data: { status: "no_show" },
-        });
-
-        continue;
-      }
-
       const first =
         (await tx.signup.count({
           where: {
@@ -1060,7 +1092,7 @@ export async function completeQuest(fd: FormData): R {
         0
       );
 
-      if (total) {
+      if (total > 0) {
         await tx.user.update({
           where: { id: su.userId },
           data: {

@@ -25,6 +25,15 @@ function toSiteInput(date: Date) {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }
 
+function formatStatus(status: string) {
+  if (status === "signed_up") return "Signed Up";
+  if (status === "no_show") return "No Show";
+
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default async function QuestPortalDetails({
   params,
 }: {
@@ -41,7 +50,7 @@ export default async function QuestPortalDetails({
       signups: {
         where: isAdmin
           ? {}
-          : { status: { in: ["Signed Up", "Completed", "No Show"] } },
+          : { status: { in: ["signed_up", "completed", "no_show"] } },
         include: { user: true },
         orderBy: { createdAt: "asc" },
       },
@@ -150,7 +159,7 @@ export default async function QuestPortalDetails({
             <p>
               <strong>Status:</strong>{" "}
               <span style={{ textTransform: "capitalize" }}>
-                {q.status}
+                {formatStatus(q.status)}
               </span>
               {q.manualLock ? " (locked)" : ""}
               {" "}· <strong>Signed Up:</strong>{" "}
@@ -196,7 +205,6 @@ export default async function QuestPortalDetails({
                 />
               </label>
 
-              {/* Match the three-column layout on the Quest Portal. */}
               <div
                 style={{
                   display: "grid",
@@ -328,7 +336,7 @@ export default async function QuestPortalDetails({
             <p>
               <strong>Status:</strong>{" "}
               <span style={{ textTransform: "capitalize" }}>
-                {q.status}
+                {formatStatus(q.status)}
               </span>
               {q.manualLock ? " (locked)" : ""}
             </p>
@@ -384,7 +392,7 @@ export default async function QuestPortalDetails({
             {q.signups.map((s) => (
               <li key={s.id}>
                 {s.user?.displayName ?? "Unknown or deleted player"}, {s.className}
-                {isAdmin || isPast ? ` — ${s.status}` : ""}
+                {isAdmin || isPast ? ` — ${formatStatus(s.status)}` : ""}
               </li>
             ))}
           </ul>
@@ -398,8 +406,9 @@ export default async function QuestPortalDetails({
               <p className="note">Postponed. Sign-ups are paused.</p>
             ) : mine ? (
               <>
-                <ActionForm action={A.signUp} className="stack">
+                <ActionForm action={A.updateSignupClass} className="stack">
                   <input type="hidden" name="questId" value={q.id} />
+                  <input type="hidden" name="userId" value={u.id} />
                   {picker}
                   <button type="submit">Change class</button>
                 </ActionForm>
@@ -443,16 +452,6 @@ export default async function QuestPortalDetails({
                   {s.user?.displayName ?? "Unknown or deleted player"}, {s.className}
                 </span>
 
-                <label className="inline">
-                  <input
-                    type="checkbox"
-                    name="noshow"
-                    value={s.userId}
-                    style={{ width: 24, minHeight: 24 }}
-                  />
-                  No-show
-                </label>
-
                 <input
                   name={`bonus_${s.userId}`}
                   type="number"
@@ -472,61 +471,91 @@ export default async function QuestPortalDetails({
         <article className="panel">
           <h2>Roster Management</h2>
 
-          <h3>
-            Current Roster ({roster.length} of {q.maxPlayers})
-          </h3>
+          
+<h3>
+  Current Roster ({roster.length} of {q.maxPlayers})
+</h3>
 
-          {roster.length === 0 && <p>No one is on the roster yet.</p>}
+{roster.length === 0 && <p>No one is on the roster yet.</p>}
 
-          {roster.map((s) => (
-            <ActionForm key={s.id} action={A.removeFromQuest} className="row">
-              <span>
-                <strong>
-                  {s.user?.displayName ?? "Unknown or deleted player"}
-                </strong>
-                , {s.className}
-              </span>
+{roster.map((s) => (
+  <div
+    key={s.id}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "0.5rem",
+      marginBottom: "0.6rem",
+      flexWrap: "wrap",
+    }}
+  >
+    <ActionForm action={A.updateSignupClass} className="inline">
+      <strong>
+        {s.user?.displayName ?? "Unknown or deleted player"}
+      </strong>
 
-              <input type="hidden" name="signupId" value={s.id} />
-              <button type="submit">Remove</button>
-            </ActionForm>
-          ))}
+      <input type="hidden" name="questId" value={q.id} />
+      <input type="hidden" name="userId" value={s.userId} />
 
-          <h3>Add a Player</h3>
+      <select
+        name="className"
+        aria-label={`Class for ${s.user?.displayName ?? "player"}`}
+        defaultValue={s.className ?? "Undecided"}
+        required
+      >
+        {CLASSES.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
 
-          <ActionForm action={A.addToQuest} className="inline">
-            <input type="hidden" name="questId" value={q.id} />
+      <button type="submit">Update Class</button>
+    </ActionForm>
 
-            <select
-              name="userId"
-              aria-label="Player"
-              required
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Select a player
-              </option>
-              {availablePlayers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.displayName}
-                </option>
-              ))}
-            </select>
+    <ActionForm action={A.removeFromQuest} className="inline">
+      <input type="hidden" name="signupId" value={s.id} />
+      <button type="submit">Remove</button>
+    </ActionForm>
+  </div>
+))}
 
-            <select
-              name="className"
-              aria-label="Class"
-              defaultValue="Undecided"
-            >
-              {CLASSES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+<h3>Add a Player</h3>
 
-            <button type="submit">Add</button>
-          </ActionForm>
+<ActionForm action={A.addToQuest} className="inline">
+  <input type="hidden" name="questId" value={q.id} />
+
+  <select
+    name="userId"
+    aria-label="Player"
+    required
+    defaultValue=""
+  >
+    <option value="" disabled>
+      Select a player
+    </option>
+    {availablePlayers.map((p) => (
+      <option key={p.id} value={p.id}>
+        {p.displayName}
+      </option>
+    ))}
+  </select>
+
+  <select
+    name="className"
+    aria-label="Class"
+    defaultValue="Undecided"
+  >
+    {CLASSES.map((c) => (
+      <option key={c} value={c}>
+        {c}
+      </option>
+    ))}
+  </select>
+
+  <button type="submit">Add</button>
+</ActionForm>
+
         </article>
       )}
     </>

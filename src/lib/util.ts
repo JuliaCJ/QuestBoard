@@ -24,6 +24,17 @@ export function zonedToUtc(local: string, tz = TZ): Date {
   return new Date(asUtc.getTime() - (shown - asUtc.getTime()));
 }
 
+// "3d 4h", "5h 12m", "9m" - how long until a date.
+export function timeLeft(d: Date, now = new Date()) {
+  const ms = d.getTime() - now.getTime();
+  if (ms <= 0) return "expired";
+  const mins = Math.floor(ms / 60000);
+  const days = Math.floor(mins / 1440), hrs = Math.floor((mins % 1440) / 60), m = mins % 60;
+  if (days) return `${days}d ${hrs}h`;
+  if (hrs) return `${hrs}h ${m}m`;
+  return `${Math.max(m, 1)}m`;
+}
+
 export type DoorState = "locked" | "priority" | "open" | "full" | "postponed";
 // Computed per viewer from time + priority + overrides. Nothing per-player is stored.
 export function doorState(

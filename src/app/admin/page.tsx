@@ -1,13 +1,17 @@
-
 import ActionForm from "@/components/ActionForm";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { fmt } from "@/lib/util";
+import { fmt, timeLeft } from "@/lib/util";
 import * as A from "@/app/actions";
 import PlayerEditor from "@/components/PlayerEditor";
+import ConfirmButton from "@/components/ConfirmButton";
 
 export default async function Admin() {
   await requireAdmin();
+
+  // Expired keys are deleted permanently. Players keep any priority they already
+  // got from a key (it is stored on the player, not on the key).
+  await db.priorityKey.deleteMany({ where: { expiresAt: { lte: new Date() } } });
 
   const [quests, players, keys] = await Promise.all([
     db.quest.findMany({
@@ -32,9 +36,7 @@ export default async function Admin() {
     }),
 
     db.priorityKey.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      include: { redeemedBy: true },
+      orderBy: { expiresAt: "asc" },
     }),
   ]);
 
@@ -201,17 +203,37 @@ export default async function Admin() {
           <button>Create key</button>
         </ActionForm>
 
+        <h3>Active keys ({keys.length})</h3>
+        {keys.length === 0 && <p>No active keys.</p>}
+
         {keys.map((k) => (
           <div className="row" key={k.id}>
             <span>
               <strong>{k.code}</strong>
+              {" "}· {timeLeft(k.expiresAt, now)} left
+              {" "}<small>(until {fmt(k.expiresAt)})</small>
             </span>
-            <span>
-              {k.redeemedBy
-                ? `redeemed by ${k.redeemedBy.displayName}`
-                : k.expiresAt < now
-                  ? "expired"
-                  : `valid until ${fmt(k.expiresAt)}`}
+
+            <span className="inline">
+              <ActionForm action={A.extendKey} className="inline">
+                <input type="hidden" name="keyId" value={k.id} />
+                <input
+                  name="days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  defaultValue={1}
+                  aria-label={`Days to add to ${k.code}`}
+                />
+                <button>Add days</button>
+              </ActionForm>
+
+              <ActionForm action={A.deleteKey} className="inline">
+                <input type="hidden" name="keyId" value={k.id} />
+                <ConfirmButton message={`Delete key "${k.code}"? It will stop working immediately.`}>
+                  Delete
+                </ConfirmButton>
+              </ActionForm>
             </span>
           </div>
         ))}

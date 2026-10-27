@@ -105,14 +105,21 @@ export async function withdraw(fd: FormData): R {
   return done("You've withdrawn from this quest.");
 }
 
+export async function markItemUsed(fd: FormData): R {
+  const u = await requireUser();
+  const r = await db.ownedItem.updateMany({
+    where: { id: s(fd, "ownedId"), userId: u.id, type: "consumable", usedAt: null },
+    data: { usedAt: new Date() },
+  });
+  if (!r.count) return "That item can't be marked as used.";
+  return done("Marked as used.");
+}
+
 export async function redeemKey(fd: FormData): R {
   const u = await requireUser();
   const key = await db.priorityKey.findUnique({ where: { code: s(fd, "code").toLowerCase() } });
   if (!key) return "That key doesn't exist.";
-  if (key.redeemedById) return "That key has already been used.";
-  if (key.expiresAt < new Date()) return "That key has expired.";
-  const claimed = await db.priorityKey.updateMany({ where: { id: key.id, redeemedById: null }, data: { redeemedById: u.id, redeemedAt: new Date() } });
-  if (!claimed.count) return "That key has already been used.";
+  if (key.expiresAt <= new Date()) return "That key has expired.";
   const until = u.priorityUntil && u.priorityUntil > key.expiresAt ? u.priorityUntil : key.expiresAt;
   await db.user.update({ where: { id: u.id }, data: { priorityUntil: until } });
   return done(`Priority access unlocked until ${fmt(until)}.`);
@@ -166,6 +173,29 @@ export async function createKey(fd: FormData): R {
   if (await db.priorityKey.findUnique({ where: { code: keyCode } })) return "A key with that code already exists.";
   const k = await db.priorityKey.create({ data: { code: keyCode, expiresAt: new Date(Date.now() + days * DAY) } });
   return done(`Key "${k.code}" created, valid until ${fmt(k.expiresAt)}.`);
+}
+
+export async function extendKey(fd: FormData): R {
+  await requireAdmin();
+  const days = Number(s(fd, "days"));
+  if (!Number.isInteger(days) || days < 1 || days > 365) return "Enter a whole number of days from 1 to 365.";
+
+  const key = await db.priorityKey.findUnique({ where: { id: s(fd, "keyId") } });
+  const now = new Date();
+  if (!key || key.expiresAt <= now) return "That key has expired or no longer exists.";
+
+  const expiresAt = new Date(key.expiresAt.getTime() + days * DAY);
+  // Matching on the old expiry stops two quick clicks from both applying.
+  const result = await db.priorityKey.updateMany({ where: { id: key.id, expiresAt: key.expiresAt }, data: { expiresAt } });
+  if (!result.count) return "That key changed. Refresh and try again.";
+  return done(`Key "${key.code}" extended to ${fmt(expiresAt)}.`);
+}
+
+export async function deleteKey(fd: FormData): R {
+  await requireAdmin();
+  const result = await db.priorityKey.deleteMany({ where: { id: s(fd, "keyId") } });
+  if (!result.count) return "Key not found.";
+  return done("Key deleted.");
 }
 
 /* ---------- admin: quests ---------- */
@@ -274,6 +304,23 @@ export async function rescheduleQuest(fd: FormData): R {
 
   if (!result.count) return "Quest not found or cannot be rescheduled.";
   return done("One-shot date updated.");
+}
+
+export async function postNow(fd: FormData): R {
+  await requireAdmin();
+
+  const now = new Date();
+  const result = await db.quest.updateMany({
+    where: {
+      id: s(fd, "questId"),
+      status: { in: ["active", "postponed"] },
+      postAt: { gt: now },
+    },
+    data: { postAt: now },
+  });
+
+  if (!result.count) return "Quest not found, or it is already on the board.";
+  return done("Quest posted to the board.");
 }
 
 export async function deferQuest(fd: FormData): R {

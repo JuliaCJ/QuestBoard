@@ -73,17 +73,25 @@ export default async function QuestPortal() {
         {currentQuests.map((q) => (
           <div className="row" key={q.id}>
             <span>
-              <Link href={`/quests/${q.id}`}>
+              <Link href={`/quest/${q.id}`}>
                 <strong>{q.title}</strong>
               </Link>
               {" "}· <span className="cap">{q.status}</span>
               {q.manualLock ? " (locked)" : ""}
               {" "}· {fmt(q.oneShotDate)}
               {" "}· {q._count.signups}/{q.maxPlayers}
+              {q.postAt > now ? ` · posts ${fmt(q.postAt)}` : ""}
             </span>
 
             {isAdmin && (
               <span className="inline">
+                {q.postAt > now && (
+                  <ActionForm action={A.postNow} className="inline">
+                    <input type="hidden" name="questId" value={q.id} />
+                    <button>Post now</button>
+                  </ActionForm>
+                )}
+
                 <ActionForm action={A.setLock} className="inline">
                   <input type="hidden" name="questId" value={q.id} />
                   <input
@@ -171,7 +179,7 @@ export default async function QuestPortal() {
           {pastQuests.map((q) => (
             <div className="row" key={q.id}>
               <span>
-                <Link href={`/quests/${q.id}`}>
+                <Link href={`/quest/${q.id}`}>
                   <strong>{q.title}</strong>
                 </Link>
                 {" "}· <span className="cap">{q.status}</span>

@@ -13,5 +13,6 @@ export async function GET(req: NextRequest) {
   });
   const ids = due.filter((q) => q._count.signups < q.minPlayers).map((q) => q.id);
   await db.quest.updateMany({ where: { id: { in: ids } }, data: { status: "postponed" } });
-  return NextResponse.json({ postponed: ids.length });
+  const purged = await db.priorityKey.deleteMany({ where: { expiresAt: { lte: new Date() } } });
+  return NextResponse.json({ postponed: ids.length, keysDeleted: purged.count });
 }

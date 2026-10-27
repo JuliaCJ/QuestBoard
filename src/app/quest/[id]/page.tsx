@@ -124,6 +124,14 @@ export default async function QuestPortalDetails({
               {" "}· <strong>Signed Up:</strong> {signedUpCount}/{q.maxPlayers}
             </p>
 
+            {q.postAt > now && (
+              <ActionForm action={A.postNow} className="inline">
+                <input type="hidden" name="questId" value={q.id} />
+                <span>Scheduled to post {fmt(q.postAt)}.</span>
+                <button>Post now</button>
+              </ActionForm>
+            )}
+
             <ActionForm key={formKey} action={A.updateQuest} className="stack">
               <input type="hidden" name="questId" value={q.id} />
 
@@ -197,7 +205,7 @@ export default async function QuestPortalDetails({
                 <label>
                   Post At
                   <input
-                    name="psost"
+                    name="post"
                     type="datetime-local"
                     defaultValue={toSiteInput(q.postAt)}
                     required
@@ -415,7 +423,6 @@ export default async function QuestPortalDetails({
 
               <button>Add</button>
             </ActionForm>
-          )
         </article>
       )}
     </>

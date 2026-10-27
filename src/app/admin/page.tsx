@@ -75,65 +75,58 @@ function renderPlayerList(list: typeof players) {
           marginTop: ".6rem",
         }}
       >
+        {/* Player information on the first row */}
+        <div>
+          <strong>{p.displayName}</strong> ({p.username})
+          {" · "}{p.renown} Renown
+          {priority ? " · Priority" : ""}
+          {p.priorityUntil && !p.hasPriority
+            ? ` until ${fmt(p.priorityUntil)}`
+            : ""}
+        </div>
+
+        {/* All buttons on the row underneath */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
+            justifyContent: "flex-start",
+            gap: "0.5rem",
             flexWrap: "wrap",
           }}
         >
-          <span>
-            <strong>{p.displayName}</strong> ({p.username})
-            {" · "}{p.renown} Renown
-            {priority ? " · Priority" : ""}
-            {p.priorityUntil && !p.hasPriority
-              ? ` until ${fmt(p.priorityUntil)}`
-              : ""}
-          </span>
+          {p.isActive ? (
+            <>
+              <PlayerEditor userId={p.id} />
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              flexWrap: "wrap",
-            }}
-          >
-            {p.isActive ? (
-              <>
-                <PlayerEditor userId={p.id} />
+              <PlayerPriorityControls
+                userId={p.id}
+                hasPriority={priority}
+                setPriorityAction={A.setPriority}
+                deactivateAction={A.deactivate}
+              />
 
-                <PlayerPriorityControls
-                  userId={p.id}
-                  hasPriority={priority}
-                  setPriorityAction={A.setPriority}
-                  deactivateAction={A.deactivate}
-                />
+              <ActionForm action={A.deletePlayer} className="inline">
+                <input type="hidden" name="userId" value={p.id} />
+                <button type="submit">Delete Player</button>
+              </ActionForm>
+            </>
+          ) : (
+            <>
+              <ActionForm
+                action={A.reactivatePlayer}
+                className="inline"
+              >
+                <input type="hidden" name="userId" value={p.id} />
+                <button type="submit">Reactivate Player</button>
+              </ActionForm>
 
-                <ActionForm action={A.deletePlayer} className="inline">
-                  <input type="hidden" name="userId" value={p.id} />
-                  <button type="submit">Delete Player</button>
-                </ActionForm>
-              </>
-            ) : (
-              <>
-                <ActionForm
-                  action={A.reactivatePlayer}
-                  className="inline"
-                >
-                  <input type="hidden" name="userId" value={p.id} />
-                  <button type="submit">Reactivate Player</button>
-                </ActionForm>
-
-                <ActionForm action={A.deletePlayer} className="inline">
-                  <input type="hidden" name="userId" value={p.id} />
-                  <button type="submit">Delete Player</button>
-                </ActionForm>
-              </>
-            )}
-          </div>
+              <ActionForm action={A.deletePlayer} className="inline">
+                <input type="hidden" name="userId" value={p.id} />
+                <button type="submit">Delete Player</button>
+              </ActionForm>
+            </>
+          )}
         </div>
       </div>
     );

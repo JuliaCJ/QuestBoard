@@ -11,10 +11,10 @@ const HISTORY_LIMIT = 200;
 
 // Fallback titles for ledger rows that have no note (older quest payouts, etc.).
 const REASON: Record<string, string> = {
-  quest: "Quest completed",
+  quest: "Quest Completed",
   bonus: "Bonus Renown",
-  admin_adjust: "Admin adjustment",
-  purchase: "Store purchase",
+  admin_adjust: "Admin Adjustment",
+  purchase: "Store Purchase",
 };
 
 const PAYOUT: Record<string, string> = {

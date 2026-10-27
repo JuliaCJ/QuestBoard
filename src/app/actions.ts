@@ -310,17 +310,27 @@ export async function postNow(fd: FormData): R {
   await requireAdmin();
 
   const now = new Date();
+  const questId = s(fd, "questId");
+
   const result = await db.quest.updateMany({
     where: {
-      id: s(fd, "questId"),
-      status: { in: ["active", "postponed"] },
+      id: questId,
+      status: "active",
       postAt: { gt: now },
     },
-    data: { postAt: now },
+    data: {
+      postAt: now,
+      prioritySignupAt: now,
+    },
   });
 
-  if (!result.count) return "Quest not found, or it is already on the board.";
-  return done("Quest posted to the board.");
+  if (!result.count) {
+    return "Quest not found, or it is already posted.";
+  }
+
+  return done(
+    "Quest posted. Priority access has started."
+  );
 }
 
 export async function deferQuest(fd: FormData): R {

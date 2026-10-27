@@ -110,7 +110,11 @@ export default async function QuestPortalDetails({
   return (
     <>
       <article className="panel">
-        <Link href="/quest">← Back to Quest Portal</Link>
+        <Link href="/quest">
+  {isAdmin
+    ? "← Back to Quest Portal"
+    : "← Back to QuestBoard"}
+</Link>
 
         {/* ---------- Admin: live quest, directly editable ---------- */}
         {isAdmin && !isPast && (

@@ -5,9 +5,16 @@ import { db } from "@/lib/db";
 import { doorState, fmt } from "@/lib/util";
 import { redeemKey } from "./actions";
 
-const LABEL = { locked: "Locked", priority: "Priority open", open: "Open", full: "Full", postponed: "Postponed" };
+const LABEL = {
+  locked: "Locked",
+  priority: "Priority Unlocked",
+  open: "Open",
+  full: "Full",
+  postponed: "Postponed",
+};
 
-export default async function Board() {
+export 
+default async function Board() {
   const u = await requireUser();
   const now = new Date();
   const hp = u.hasPriority || (!!u.priorityUntil && u.priorityUntil > now);

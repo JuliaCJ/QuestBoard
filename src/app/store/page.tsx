@@ -142,61 +142,70 @@ function PlayerStore({
 
           {group.map((item) => (
             <div className="item shopcard" key={item.id}>
-              <Thumb item={item} />
+  <Thumb item={item} />
 
-              <div className="stack">
-                <h3
-                  style={{
-                    margin: 0,
-                    fontFamily: "var(--head), Georgia, serif",
-                    fontWeight: 400,
-                    fontSize: "1.4rem",
-                  }}
-                >
-                  {item.name}
-                </h3>
+  <div className="stack" style={{ flex: 1, minWidth: 0 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "1rem",
+        width: "100%",
+      }}
+    >
+      <h3
+        style={{
+          margin: 0,
+          fontFamily: "var(--head), Georgia, serif",
+          fontWeight: 400,
+          fontSize: "1.4rem",
+        }}
+      >
+        {item.name}
+      </h3>
 
-                <p style={{ margin: 0 }}>
-                  <span className="cap">{item.type}</span>
-                  {" · "}
-                  <strong>{item.price} Renown</strong>
-                </p>
+      <BuyForm
+        action={A.buyItem}
+        itemId={item.id}
+        itemName={item.name}
+        price={item.price}
+        renown={renown}
+      />
+    </div>
 
-                {item.description && (
-                  <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-                    {item.description}
-                  </p>
-                )}
+    <p style={{ margin: 0 }}>
+      <span className="cap">{item.type}</span>
+      {" · "}
+      <strong>{item.price} Renown</strong>
+    </p>
 
-                {/* Purchase button for this item */}
-                <BuyForm
-                  action={A.buyItem}
-                  itemId={item.id}
-                  itemName={item.name}
-                  price={item.price}
-                  renown={renown}
-                />
+    {item.description && (
+      <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+        {item.description}
+      </p>
+    )}
 
-                {item.links.length > 0 && (
-                  <p style={{ margin: 0 }}>
-                    <strong>Find it Online:</strong>{" "}
-                    {item.links.map((l, i) => (
-                      <span key={l.id}>
-                        {i > 0 && " · "}
-                        <a
-                          href={l.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {l.label}
-                        </a>
-                      </span>
-                    ))}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
+    {item.links.length > 0 && (
+      <p style={{ margin: 0 }}>
+        <strong>Find it Online:</strong>{" "}
+        {item.links.map((l, i) => (
+          <span key={l.id}>
+            {i > 0 && " · "}
+            <a
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {l.label}
+            </a>
+          </span>
+        ))}
+      </p>
+    )}
+  </div>
+</div>
+      ))}
         </article>
       ))}
     </>

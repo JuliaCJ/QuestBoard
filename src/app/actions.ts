@@ -13,7 +13,6 @@ import {
 import {
   CLASSES,
   DAY,
-  FIRST_QUEST_BONUS,
   ITEM_TYPES,
   PRIORITY_WINDOW_DAYS,
   TZ,
@@ -1055,14 +1054,6 @@ export async function completeQuest(fd: FormData): R {
     }
 
     for (const su of q.signups) {
-      const first =
-        (await tx.signup.count({
-          where: {
-            userId: su.userId,
-            status: "completed",
-          },
-        })) === 0;
-
       const bonus = Math.max(
         0,
         parseInt(s(fd, `bonus_${su.userId}`), 10) || 0
@@ -1077,14 +1068,6 @@ export async function completeQuest(fd: FormData): R {
           amount: bonus,
           reason: "bonus",
         },
-        ...(first && FIRST_QUEST_BONUS > 0
-          ? [
-              {
-                amount: FIRST_QUEST_BONUS,
-                reason: "first_quest",
-              },
-            ]
-          : []),
       ].filter((r) => r.amount > 0);
 
       for (const r of rows) {
@@ -1128,7 +1111,6 @@ export async function completeQuest(fd: FormData): R {
 
   return done(msg);
 }
-
 /* ---------- admin: store ---------- */
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;

@@ -13,12 +13,14 @@ const HISTORY_LIMIT = 200;
 const REASON: Record<string, string> = {
   quest: "Quest completed",
   bonus: "Bonus Renown",
-  first_quest: "First quest bonus",
   admin_adjust: "Admin adjustment",
   purchase: "Store purchase",
 };
 
-const PAYOUT: Record<string, string> = { quest: "Reward", bonus: "Bonus", first_quest: "First quest bonus" };
+const PAYOUT: Record<string, string> = {
+  quest: "Reward",
+  bonus: "Bonus",
+};
 
 export default async function Account() {
   const u = await requireUser();

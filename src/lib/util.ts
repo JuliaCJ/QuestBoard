@@ -3,7 +3,6 @@ import { randomInt } from "crypto";
 export const TZ = process.env.SITE_TZ || "America/New_York";
 export const CLASSES = ["Undecided", "Artificer", "Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"];
 export const DAY = 86400000;
-export const FIRST_QUEST_BONUS = 50;
 export const PRIORITY_WINDOW_DAYS = 5;
 export const POSTPONE_LEAD_DAYS = 10;
 export const ITEM_TYPES = ["consumable", "equipable"] as const;

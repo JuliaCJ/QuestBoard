@@ -1266,6 +1266,87 @@ function parseItem(fd: FormData) {
   };
 }
 
+
+export async function buyItem(fd: FormData): R {
+  const u = await requireUser();
+  const itemId = s(fd, "itemId");
+
+  if (!itemId) {
+    return "Missing item ID.";
+  }
+
+  if (u.role !== "player") {
+    return "Only players can purchase store items.";
+  }
+
+  const msg = await db.$transaction(async (tx) => {
+    // Lock the player's row to prevent concurrent purchases
+    // from spending the same Renown balance.
+    await tx.$queryRaw`
+      SELECT id FROM "User"
+      WHERE id = ${u.id}
+      FOR UPDATE
+    `;
+
+    const player = await tx.user.findUnique({
+      where: { id: u.id },
+      select: {
+        id: true,
+        renown: true,
+        isActive: true,
+      },
+    });
+
+    if (!player || !player.isActive) {
+      return "Your account is not active.";
+    }
+
+    const item = await tx.shopItem.findUnique({
+      where: { id: itemId },
+    });
+
+    if (!item || !item.isActive) {
+      return "This item is no longer available.";
+    }
+
+    if (player.renown < item.price) {
+      return `You don't have enough Renown to buy "${item.name}".`;
+    }
+
+    // Deduct Renown and record the transaction.
+    if (item.price > 0) {
+      await tx.user.update({
+        where: { id: player.id },
+        data: {
+          renown: { decrement: item.price },
+        },
+      });
+
+      await tx.ledger.create({
+        data: {
+          userId: player.id,
+          amount: -item.price,
+          reason: "store_purchase",
+          note: `Purchased "${item.name}"`,
+        },
+      });
+    }
+
+    // Store a snapshot of the item in the player's inventory.
+    await tx.ownedItem.create({
+      data: {
+        userId: player.id,
+        name: item.name,
+        type: item.type,
+      },
+    });
+
+    return `You bought "${item.name}" for ${item.price} Renown.`;
+  });
+
+  return done(msg);
+}
+
 export async function createItem(fd: FormData): R {
   await requireAdmin();
 

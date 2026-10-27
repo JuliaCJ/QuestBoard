@@ -1,3 +1,4 @@
+
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
@@ -5,9 +6,16 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as A from "@/app/actions";
 import SignupDates from "@/components/SignupDates";
-import { CLASSES, PRIORITY_WINDOW_DAYS, TZ, doorState, fmt } from "@/lib/util";
+import {
+  CLASSES,
+  PRIORITY_WINDOW_DAYS,
+  TZ,
+  doorState,
+  fmt,
+  priorityUnlocked,
+} from "@/lib/util";
 
-// Formats a date for <input type="datetime-local"> in the SITE time zone,
+// Formats a date for datetime-local in the SITE time zone,
 // which is what zonedToUtc() in the update action expects.
 function toSiteInput(date: Date) {
   const p = Object.fromEntries(
@@ -23,6 +31,7 @@ function toSiteInput(date: Date) {
       .formatToParts(date)
       .map((x) => [x.type, x.value])
   );
+
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }
 
@@ -40,7 +49,9 @@ export default async function QuestPortalDetails({
     where: { id },
     include: {
       signups: {
-        where: isAdmin ? {} : { status: { in: ["signed_up", "completed"] } },
+        where: isAdmin
+          ? {}
+          : { status: { in: ["signed_up", "completed", "no_show"] } },
         include: { user: true },
         orderBy: { createdAt: "asc" },
       },
@@ -49,23 +60,65 @@ export default async function QuestPortalDetails({
 
   if (!q) notFound();
 
-  const isPast = q.status === "completed" || q.status === "cancelled";
+  const isPast =
+    q.status === "completed" || q.status === "cancelled";
 
-  // Deferred and past quests are available in the portal to admins only.
-  if (!isAdmin && (q.status !== "active" || q.postAt > now)) {
-    notFound();
+  // Players may view completed quests they participated in.
+  // Other past quests and postponed quests remain admin-only.
+  if (!isAdmin) {
+    if (q.status === "completed") {
+      const participated = q.signups.some(
+        (signup) =>
+          signup.userId === u.id &&
+          ["completed", "no_show"].includes(signup.status)
+      );
+
+      if (!participated) notFound();
+    } else if (q.status !== "active" || q.postAt > now) {
+      notFound();
+    }
   }
 
-  const signedUpCount = q.signups.filter((s) => s.status === "signed_up").length;
-  const roster = q.signups.filter((s) => s.status === "signed_up");
+  // Current sign-ups are used for roster capacity and sign-up availability.
+  const signedUpCount = q.signups.filter(
+    (s) => s.status === "signed_up"
+  ).length;
 
-  const hp = u.hasPriority || (!!u.priorityUntil && u.priorityUntil > now);
-  const st = doorState(q, signedUpCount, hp, now);
+  const roster = q.signups.filter(
+    (s) => s.status === "signed_up"
+  );
 
-  const mine = q.signups.find((s) => s.userId === u.id && s.status === "signed_up");
+  // Historical participation includes completed players and no-shows.
+  const historyCount = q.signups.filter(
+    (s) => ["completed", "no_show"].includes(s.status)
+  ).length;
+
+  const displayCount = isPast ? historyCount : signedUpCount;
+
+  const hp =
+    u.hasPriority ||
+    (!!u.priorityUntil && u.priorityUntil > now);
+
+  const rawSt = doorState(q, signedUpCount, hp, now);
+
+  // Priority holders (or key redeemers) can join locked quests that still have room.
+  const unlocked = priorityUnlocked(
+    q,
+    rawSt,
+    signedUpCount,
+    hp
+  );
+
+  const st = unlocked ? "priority" : rawSt;
+
+  const mine = q.signups.find(
+    (s) => s.userId === u.id && s.status === "signed_up"
+  );
 
   const canJoin =
-    !isAdmin && q.status === "active" && (st === "open" || st === "priority");
+    !isAdmin &&
+    q.status === "active" &&
+    (st === "open" || st === "priority");
 
   // Only admins managing a live quest need the player list.
   const players =
@@ -77,12 +130,18 @@ export default async function QuestPortalDetails({
       : [];
 
   const rostered = new Set(roster.map((s) => s.userId));
-  const availablePlayers = players.filter((p) => !rostered.has(p.id));
+
+  const availablePlayers = players.filter(
+    (p) => !rostered.has(p.id)
+  );
 
   const picker = (
     <label>
       Class
-      <select name="className" defaultValue={mine?.className ?? "Undecided"}>
+      <select
+        name="className"
+        defaultValue={mine?.className ?? "Undecided"}
+      >
         {CLASSES.map((c) => (
           <option key={c} value={c}>
             {c}
@@ -92,8 +151,7 @@ export default async function QuestPortalDetails({
     </label>
   );
 
-  // Remounts the edit form whenever saved values change, so the fields and the
-  // "Cancel changes" reset always return to what is currently saved.
+  // Remount the edit form whenever saved values change.
   const formKey = [
     q.title,
     q.description,
@@ -110,49 +168,80 @@ export default async function QuestPortalDetails({
   return (
     <>
       <article className="panel">
-        <Link href="/quest">
-  {isAdmin
-    ? "← Back to Quest Portal"
-    : "← Back to QuestBoard"}
-</Link>
+        {isAdmin ? (
+          <Link href="/quest">← Back to Quest Portal</Link>
+        ) : (
+          <Link href="/">← Back to QuestBoard</Link>
+        )}
 
-        {/* ---------- Admin: live quest, directly editable ---------- */}
+        {/* Admin: live quest, directly editable */}
         {isAdmin && !isPast && (
           <>
             <h1>Quest Details</h1>
 
             <p>
               <strong>Status:</strong>{" "}
-<span style={{ textTransform: "capitalize" }}>{q.status}</span>
+              <span style={{ textTransform: "capitalize" }}>
+                {q.status}
+              </span>
               {q.manualLock ? " (locked)" : ""}
-              {" "}· <strong>Signed Up:</strong> {signedUpCount}/{q.maxPlayers}
+              {" "}· <strong>Signed Up:</strong>{" "}
+              {signedUpCount}/{q.maxPlayers}
             </p>
 
             {q.postAt > now && (
               <ActionForm action={A.postNow} className="inline">
-                <input type="hidden" name="questId" value={q.id} />
-                <span>Scheduled to post {fmt(q.postAt)}.</span>
-                <button>Post now</button>
+                <input
+                  type="hidden"
+                  name="questId"
+                  value={q.id}
+                />
+                <span>
+                  Scheduled to post {fmt(q.postAt)}.
+                </span>
+                <button type="submit">Post now</button>
               </ActionForm>
             )}
 
-            <ActionForm key={formKey} action={A.updateQuest} className="stack">
-              <input type="hidden" name="questId" value={q.id} />
+            <ActionForm
+              key={formKey}
+              action={A.updateQuest}
+              className="stack"
+            >
+              <input
+                type="hidden"
+                name="questId"
+                value={q.id}
+              />
 
               <label>
                 Title
-                <input name="title" defaultValue={q.title} required />
+                <input
+                  name="title"
+                  defaultValue={q.title}
+                  required
+                />
               </label>
 
               <label>
                 Description
-                <textarea name="description" rows={4} defaultValue={q.description} />
+                <textarea
+                  name="description"
+                  rows={4}
+                  defaultValue={q.description}
+                />
               </label>
 
               <div className="grid2">
                 <label>
                   Level
-                  <input name="level" type="number" min={1} defaultValue={q.level} required />
+                  <input
+                    name="level"
+                    type="number"
+                    min={1}
+                    defaultValue={q.level}
+                    required
+                  />
                 </label>
 
                 <label>
@@ -201,10 +290,10 @@ export default async function QuestPortalDetails({
                 </label>
 
                 <SignupDates
-                priority={toSiteInput(q.prioritySignupAt)}
-                general={toSiteInput(q.generalSignupAt)}
-                days={PRIORITY_WINDOW_DAYS}
-/>
+                  priority={toSiteInput(q.prioritySignupAt)}
+                  general={toSiteInput(q.generalSignupAt)}
+                  days={PRIORITY_WINDOW_DAYS}
+                />
 
                 <label>
                   Post At
@@ -229,28 +318,33 @@ export default async function QuestPortalDetails({
           </>
         )}
 
-        {/* ---------- Everyone else: read-only details ---------- */}
+        {/* Read-only details for players and archived quests */}
         {(!isAdmin || isPast) && (
           <>
             <h1>{q.title}</h1>
 
             <p>
               <strong>Status:</strong>{" "}
-<span style={{ textTransform: "capitalize" }}>{q.status}</span>
+              <span style={{ textTransform: "capitalize" }}>
+                {q.status}
+              </span>
               {q.manualLock ? " (locked)" : ""}
             </p>
 
             <p>
               <strong>Level:</strong> {q.level}
-              {" "}· <strong>Reward:</strong> {q.renownReward} Renown
+              {" "}· <strong>Reward:</strong>{" "}
+              {q.renownReward} Renown
             </p>
 
             <p>
-              <strong>One-shot date:</strong> {fmt(q.oneShotDate)}
+              <strong>One-shot date:</strong>{" "}
+              {fmt(q.oneShotDate)}
             </p>
 
             <p>
-              <strong>Player Limits:</strong> {q.minPlayers}–{q.maxPlayers}
+              <strong>Player Limits:</strong>{" "}
+              {q.minPlayers}–{q.maxPlayers}
             </p>
 
             <p>
@@ -258,11 +352,13 @@ export default async function QuestPortalDetails({
             </p>
 
             <p>
-              <strong>Priority Sign-Up Opens:</strong> {fmt(q.prioritySignupAt)}
+              <strong>Priority Sign-Up Opens:</strong>{" "}
+              {fmt(q.prioritySignupAt)}
             </p>
 
             <p>
-              <strong>General Sign-Up Opens:</strong> {fmt(q.generalSignupAt)}
+              <strong>General Sign-Up Opens:</strong>{" "}
+              {fmt(q.generalSignupAt)}
             </p>
 
             <h2>Description</h2>
@@ -276,8 +372,8 @@ export default async function QuestPortalDetails({
                   <strong>Created:</strong> {fmt(q.createdAt)}
                 </p>
                 <p>
-                  This quest is archived. Its details and player history are
-                  read-only.
+                  This quest is archived. Its details and player
+                  history are read-only.
                 </p>
               </>
             )}
@@ -287,8 +383,9 @@ export default async function QuestPortalDetails({
 
       <article className="panel">
         <h2>
-          {isPast || isAdmin ? "Player History" : "Party"} ({signedUpCount} of{" "}
-          {q.maxPlayers} Signed Up)
+          {isPast || isAdmin ? "Player History" : "Party"} (
+          {displayCount} of {q.maxPlayers}{" "}
+          {isPast ? "Participated" : "Signed Up"})
         </h2>
 
         {q.signups.length === 0 ? (
@@ -297,38 +394,56 @@ export default async function QuestPortalDetails({
           <ul>
             {q.signups.map((s) => (
               <li key={s.id}>
-                {s.user.displayName}, {s.className}
+                {s.user?.displayName ??
+                  "Unknown or deleted player"}
+                , {s.className}
                 {isAdmin || isPast ? ` — ${s.status}` : ""}
               </li>
             ))}
           </ul>
         )}
 
-        {/* ---------- Player sign-up controls ---------- */}
+        {/* Player sign-up controls */}
         {!isAdmin && (
           <>
             {q.status === "completed" ? (
-              <p className="note">This quest is complete.</p>
+              <p className="note">
+                This quest is complete.
+              </p>
             ) : q.status === "postponed" ? (
-              <p className="note">Postponed. Sign-ups are paused.</p>
+              <p className="note">
+                Postponed. Sign-ups are paused.
+              </p>
             ) : mine ? (
               <>
                 <ActionForm action={A.signUp} className="stack">
-                  <input type="hidden" name="questId" value={q.id} />
+                  <input
+                    type="hidden"
+                    name="questId"
+                    value={q.id}
+                  />
                   {picker}
-                  <button>Change class</button>
+                  <button type="submit">Change class</button>
                 </ActionForm>
 
                 <ActionForm action={A.withdraw} className="stack">
-                  <input type="hidden" name="questId" value={q.id} />
-                  <button>Withdraw</button>
+                  <input
+                    type="hidden"
+                    name="questId"
+                    value={q.id}
+                  />
+                  <button type="submit">Withdraw</button>
                 </ActionForm>
               </>
             ) : canJoin ? (
               <ActionForm action={A.signUp} className="stack">
-                <input type="hidden" name="questId" value={q.id} />
+                <input
+                  type="hidden"
+                  name="questId"
+                  value={q.id}
+                />
                 {picker}
-                <button>Sign up</button>
+                <button type="submit">Sign up</button>
               </ActionForm>
             ) : (
               <p className="note">
@@ -336,27 +451,37 @@ export default async function QuestPortalDetails({
                   ? "This quest is full."
                   : st === "priority"
                     ? "Priority sign-up is open."
-                    : `Sign-ups open for everyone ${fmt(q.generalSignupAt)}.`}
+                    : `Sign-ups open for everyone ${fmt(
+                        q.generalSignupAt
+                      )}.`}
               </p>
             )}
           </>
         )}
       </article>
 
-      {/* ---------- Admin: complete quest ---------- */}
+      {/* Admin: complete quest */}
       {isAdmin && !isPast && q.status === "active" && (
         <article className="panel">
           <ActionForm action={A.completeQuest} className="stack">
-            <input type="hidden" name="questId" value={q.id} />
+            <input
+              type="hidden"
+              name="questId"
+              value={q.id}
+            />
 
             <h2>Complete Quest</h2>
 
-            {roster.length === 0 && <p>No one is signed up.</p>}
+            {roster.length === 0 && (
+              <p>No one is signed up.</p>
+            )}
 
             {roster.map((s) => (
               <div className="row" key={s.id}>
                 <span>
-                  {s.user.displayName}, {s.className}
+                  {s.user?.displayName ??
+                    "Unknown or deleted player"}
+                  , {s.className}
                 </span>
 
                 <label className="inline">
@@ -364,7 +489,10 @@ export default async function QuestPortalDetails({
                     type="checkbox"
                     name="noshow"
                     value={s.userId}
-                    style={{ width: 24, minHeight: 24 }}
+                    style={{
+                      width: 24,
+                      minHeight: 24,
+                    }}
                   />
                   No-show
                 </label>
@@ -379,12 +507,14 @@ export default async function QuestPortalDetails({
               </div>
             ))}
 
-            <button>Complete and Pay Out Renown</button>
+            <button type="submit">
+              Complete and Pay Out Renown
+            </button>
           </ActionForm>
         </article>
       )}
 
-      {/* ---------- Admin: roster management ---------- */}
+      {/* Admin: roster management */}
       {isAdmin && !isPast && (
         <article className="panel">
           <h2>Roster Management</h2>
@@ -393,40 +523,76 @@ export default async function QuestPortalDetails({
             Current Roster ({roster.length} of {q.maxPlayers})
           </h3>
 
-          {roster.length === 0 && <p>No one is on the roster yet.</p>}
+          {roster.length === 0 && (
+            <p>No one is on the roster yet.</p>
+          )}
 
           {roster.map((s) => (
-            <ActionForm key={s.id} action={A.removeFromQuest} className="row">
+            <ActionForm
+              key={s.id}
+              action={A.removeFromQuest}
+              className="row"
+            >
               <span>
-                <strong>{s.user.displayName}</strong>, {s.className}
+                <strong>
+                  {s.user?.displayName ??
+                    "Unknown or deleted player"}
+                </strong>
+                , {s.className}
               </span>
-              <input type="hidden" name="signupId" value={s.id} />
-              <button>Remove</button>
+
+              <input
+                type="hidden"
+                name="signupId"
+                value={s.id}
+              />
+
+              <button type="submit">Remove</button>
             </ActionForm>
           ))}
 
-          <h3> Add a Player</h3>
-            <ActionForm action={A.addToQuest} className="inline">
-              <input type="hidden" name="questId" value={q.id} />
+          <h3>Add a Player</h3>
 
-              <select name="userId" aria-label="Player" required>
-                {availablePlayers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.displayName}
-                  </option>
-                ))}
-              </select>
+          <ActionForm
+            action={A.addToQuest}
+            className="inline"
+          >
+            <input
+              type="hidden"
+              name="questId"
+              value={q.id}
+            />
 
-              <select name="className" aria-label="Class">
-                {CLASSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+            <select
+              name="userId"
+              aria-label="Player"
+              required
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select a player
+              </option>
+              {availablePlayers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.displayName}
+                </option>
+              ))}
+            </select>
 
-              <button>Add</button>
-            </ActionForm>
+            <select
+              name="className"
+              aria-label="Class"
+              defaultValue="Undecided"
+            >
+              {CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            <button type="submit">Add</button>
+          </ActionForm>
         </article>
       )}
     </>

@@ -85,12 +85,11 @@ export default async function QuestPortal() {
 
             {isAdmin && (
               <span className="inline">
-                {q.postAt > now && (
-                  <ActionForm action={A.postNow} className="inline">
-                    <input type="hidden" name="questId" value={q.id} />
-                    <button>Post now</button>
-                  </ActionForm>
-                )}
+                {/* Always show Post Now to administrators. */}
+                <ActionForm action={A.postNow} className="inline">
+                  <input type="hidden" name="questId" value={q.id} />
+                  <button type="submit">Post Now</button>
+                </ActionForm>
 
                 <ActionForm action={A.setLock} className="inline">
                   <input type="hidden" name="questId" value={q.id} />
@@ -99,7 +98,7 @@ export default async function QuestPortal() {
                     name="value"
                     value={q.manualLock ? "0" : "1"}
                   />
-                  <button>
+                  <button type="submit">
                     {q.manualLock ? "Unlock" : "Lock"}
                   </button>
                 </ActionForm>
@@ -107,7 +106,7 @@ export default async function QuestPortal() {
                 {q.status === "active" && (
                   <ActionForm action={A.deferQuest} className="inline">
                     <input type="hidden" name="questId" value={q.id} />
-                    <button>Defer</button>
+                    <button type="submit">Defer</button>
                   </ActionForm>
                 )}
 
@@ -123,7 +122,7 @@ export default async function QuestPortal() {
                     defaultValue={toLocalInput(q.oneShotDate)}
                     required
                   />
-                  <button>Reschedule</button>
+                  <button type="submit">Reschedule</button>
                 </ActionForm>
 
                 {q.status === "postponed" && (
@@ -152,13 +151,13 @@ export default async function QuestPortal() {
                       name="post"
                       value={toLocalInput(q.postAt)}
                     />
-                    <button>Reactivate</button>
+                    <button type="submit">Reactivate</button>
                   </ActionForm>
                 )}
 
                 <ActionForm action={A.cancelQuest} className="inline">
                   <input type="hidden" name="questId" value={q.id} />
-                  <button>Delete Permanently</button>
+                  <button type="submit">Delete Permanently</button>
                 </ActionForm>
               </span>
             )}
@@ -193,7 +192,7 @@ export default async function QuestPortal() {
                   className="inline"
                 >
                   <input type="hidden" name="questId" value={q.id} />
-                  <button>Delete Permanently</button>
+                  <button type="submit">Delete Permanently</button>
                 </ActionForm>
               </span>
             </div>
@@ -300,7 +299,7 @@ export default async function QuestPortal() {
               </label>
             </div>
 
-            <button>Create Quest</button>
+            <button type="submit">Create Quest</button>
           </ActionForm>
         </article>
       )}

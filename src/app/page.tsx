@@ -2,19 +2,12 @@ import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { doorState, fmt } from "@/lib/util";
-import { redeemKey } from "./actions";
+import { doorState, fmt, priorityUnlocked } from "@/lib/util";
+import { redeemKey } from "@/app/actions";
 
-const LABEL = {
-  locked: "Locked",
-  priority: "Priority Unlocked",
-  open: "Open",
-  full: "Full",
-  postponed: "Postponed",
-};
+const LABEL = { locked: "Locked", priority: "Priority open", open: "Open", full: "Full", postponed: "Postponed" };
 
-export 
-default async function Board() {
+export default async function Board() {
   const u = await requireUser();
   const now = new Date();
   const hp = u.hasPriority || (!!u.priorityUntil && u.priorityUntil > now);
@@ -28,10 +21,13 @@ default async function Board() {
       <section className="hall" aria-label="Quests">
         {quests.length === 0 && <p className="empty">The hallway is quiet. No quests are posted yet.</p>}
         {quests.map((q) => {
-          const st = doorState(q, q._count.signups, hp, now);
+          const rawSt = doorState(q, q._count.signups, hp, now);
+          // Priority holders (or key redeemers) see locked quests as unlocked for them.
+          const unlocked = priorityUnlocked(q, rawSt, q._count.signups, hp);
+          const st = unlocked ? "priority" : rawSt;
           return (
             <Link key={q.id} href={`/quest/${q.id}`} className={`door ${st}`}>
-              <span className="state">{LABEL[st]}</span>
+              <span className="state">{unlocked ? "Priority Unlocked" : LABEL[st]}</span>
               <span className="plaque">
                 <strong>{q.title}</strong>
                 <span>Level {q.level}</span>

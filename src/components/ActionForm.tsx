@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useActionState } from "react";
@@ -9,10 +8,12 @@ export default function ActionForm({
   action,
   className,
   children,
+  messageBelow = true,
 }: {
   action: Action;
   className?: string;
   children: React.ReactNode;
+  messageBelow?: boolean;
 }) {
   const [msg, run] = useActionState(
     async (_: string, fd: FormData): Promise<string> => {
@@ -23,13 +24,16 @@ export default function ActionForm({
   );
 
   return (
-    <form action={run} className={className}>
-      {children}
-      {msg && (
+    <div>
+      <form action={run} className={className}>
+        {children}
+      </form>
+
+      {messageBelow && msg && (
         <p className="note" role="status">
           {msg}
         </p>
       )}
-    </form>
+    </div>
   );
 }

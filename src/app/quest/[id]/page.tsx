@@ -2,6 +2,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
+import SignupControls from "@/components/SignupControls";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as A from "@/app/actions";
@@ -121,7 +122,10 @@ export default async function QuestPortalDetails({
   const picker = (
     <label>
       Class
-      <select name="className" defaultValue={mine?.className ?? "Undecided"}>
+      <select
+        name="className"
+        defaultValue={mine?.className ?? "Undecided"}
+      >
         {CLASSES.map((c) => (
           <option key={c} value={c}>
             {c}
@@ -370,7 +374,8 @@ export default async function QuestPortalDetails({
                   <strong>Created:</strong> {fmt(q.createdAt)}
                 </p>
                 <p>
-                  This quest is archived. Its details and player history are read-only.
+                  This quest is archived. Its details and player history are
+                  read-only.
                 </p>
               </>
             )}
@@ -391,7 +396,8 @@ export default async function QuestPortalDetails({
           <ul>
             {q.signups.map((s) => (
               <li key={s.id}>
-                {s.user?.displayName ?? "Unknown or deleted player"}, {s.className}
+                {s.user?.displayName ?? "Unknown or deleted player"},{" "}
+                {s.className}
                 {isAdmin || isPast ? ` — ${formatStatus(s.status)}` : ""}
               </li>
             ))}
@@ -405,19 +411,14 @@ export default async function QuestPortalDetails({
             ) : q.status === "postponed" ? (
               <p className="note">Postponed. Sign-ups are paused.</p>
             ) : mine ? (
-              <>
-                <ActionForm action={A.updateSignupClass} className="stack">
-                  <input type="hidden" name="questId" value={q.id} />
-                  <input type="hidden" name="userId" value={u.id} />
-                  {picker}
-                  <button type="submit">Change class</button>
-                </ActionForm>
-
-                <ActionForm action={A.withdraw} className="stack">
-                  <input type="hidden" name="questId" value={q.id} />
-                  <button type="submit">Withdraw</button>
-                </ActionForm>
-              </>
+              <SignupControls
+                questId={q.id}
+                userId={u.id}
+                currentClass={mine.className ?? "Undecided"}
+                classes={CLASSES}
+                updateAction={A.updateSignupClass}
+                withdrawAction={A.withdraw}
+              />
             ) : canJoin ? (
               <ActionForm action={A.signUp} className="stack">
                 <input type="hidden" name="questId" value={q.id} />
@@ -449,7 +450,8 @@ export default async function QuestPortalDetails({
             {roster.map((s) => (
               <div className="row" key={s.id}>
                 <span>
-                  {s.user?.displayName ?? "Unknown or deleted player"}, {s.className}
+                  {s.user?.displayName ?? "Unknown or deleted player"},{" "}
+                  {s.className}
                 </span>
 
                 <input
@@ -471,91 +473,91 @@ export default async function QuestPortalDetails({
         <article className="panel">
           <h2>Roster Management</h2>
 
-          
-<h3>
-  Current Roster ({roster.length} of {q.maxPlayers})
-</h3>
+          <h3>
+            Current Roster ({roster.length} of {q.maxPlayers})
+          </h3>
 
-{roster.length === 0 && <p>No one is on the roster yet.</p>}
+          {roster.length === 0 && <p>No one is on the roster yet.</p>}
 
-{roster.map((s) => (
-  <div
-    key={s.id}
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "0.5rem",
-      marginBottom: "0.6rem",
-      flexWrap: "wrap",
-    }}
-  >
-    <ActionForm action={A.updateSignupClass} className="inline">
-      <strong>
-        {s.user?.displayName ?? "Unknown or deleted player"}
-      </strong>
+          {roster.map((s) => (
+            <div
+              key={s.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                marginBottom: "0.6rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <ActionForm action={A.updateSignupClass} className="inline">
+                <strong>
+                  {s.user?.displayName ?? "Unknown or deleted player"}
+                </strong>
 
-      <input type="hidden" name="questId" value={q.id} />
-      <input type="hidden" name="userId" value={s.userId} />
+                <input type="hidden" name="questId" value={q.id} />
+                <input type="hidden" name="userId" value={s.userId} />
 
-      <select
-        name="className"
-        aria-label={`Class for ${s.user?.displayName ?? "player"}`}
-        defaultValue={s.className ?? "Undecided"}
-        required
-      >
-        {CLASSES.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
+                <select
+                  name="className"
+                  aria-label={`Class for ${
+                    s.user?.displayName ?? "player"
+                  }`}
+                  defaultValue={s.className ?? "Undecided"}
+                  required
+                >
+                  {CLASSES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
 
-      <button type="submit">Update Class</button>
-    </ActionForm>
+                <button type="submit">Update Class</button>
+              </ActionForm>
 
-    <ActionForm action={A.removeFromQuest} className="inline">
-      <input type="hidden" name="signupId" value={s.id} />
-      <button type="submit">Remove</button>
-    </ActionForm>
-  </div>
-))}
+              <ActionForm action={A.removeFromQuest} className="inline">
+                <input type="hidden" name="signupId" value={s.id} />
+                <button type="submit">Remove</button>
+              </ActionForm>
+            </div>
+          ))}
 
-<h3>Add a Player</h3>
+          <h3>Add a Player</h3>
 
-<ActionForm action={A.addToQuest} className="inline">
-  <input type="hidden" name="questId" value={q.id} />
+          <ActionForm action={A.addToQuest} className="inline">
+            <input type="hidden" name="questId" value={q.id} />
 
-  <select
-    name="userId"
-    aria-label="Player"
-    required
-    defaultValue=""
-  >
-    <option value="" disabled>
-      Select a player
-    </option>
-    {availablePlayers.map((p) => (
-      <option key={p.id} value={p.id}>
-        {p.displayName}
-      </option>
-    ))}
-  </select>
+            <select
+              name="userId"
+              aria-label="Player"
+              required
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select a player
+              </option>
+              {availablePlayers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.displayName}
+                </option>
+              ))}
+            </select>
 
-  <select
-    name="className"
-    aria-label="Class"
-    defaultValue="Undecided"
-  >
-    {CLASSES.map((c) => (
-      <option key={c} value={c}>
-        {c}
-      </option>
-    ))}
-  </select>
+            <select
+              name="className"
+              aria-label="Class"
+              defaultValue="Undecided"
+            >
+              {CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
 
-  <button type="submit">Add</button>
-</ActionForm>
-
+            <button type="submit">Add</button>
+          </ActionForm>
         </article>
       )}
     </>

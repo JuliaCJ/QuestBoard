@@ -1,4 +1,5 @@
 "use server";
+import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -329,6 +330,11 @@ export async function resetPlayer(fd: FormData): R {
 
     // Remove all quest sign-ups, including historical sign-ups.
     await tx.signup.deleteMany({
+      where: { userId: player.id },
+    });
+
+    // Remove all achievements earned by this player. Achievement definitions remain.
+    await tx.userAchievement.deleteMany({
       where: { userId: player.id },
     });
 
@@ -837,11 +843,6 @@ export async function deletePastQuest(fd: FormData): R {
       return "Only completed or cancelled quests can be permanently deleted.";
     }
 
-    await tx.ledger.updateMany({
-      where: { questId },
-      data: { questId: null },
-    });
-
     await tx.signup.deleteMany({
       where: { questId },
     });
@@ -874,14 +875,6 @@ export async function cancelQuest(fd: FormData): R {
 
     if (q.status === "completed") {
       return "Completed quests cannot be deleted.";
-    }
-
-    const payouts = await tx.ledger.count({
-      where: { questId },
-    });
-
-    if (payouts > 0) {
-      return "This quest has Renown ledger records and cannot be deleted without affecting history.";
     }
 
     await tx.signup.deleteMany({
@@ -1080,6 +1073,163 @@ export async function updateSignupClass(fd: FormData): R {
   return done("Player class updated.");
 }
 
+type AchievementTx = Prisma.TransactionClient;
+
+/** Creates an achievement award and its Renown payout exactly once. */
+async function grantAchievement(
+  tx: AchievementTx,
+  achievement: { id: string; name: string; reward: number },
+  userId: string,
+  source: "automatic" | "manual"
+) {
+  const created = await tx.userAchievement.createMany({
+    data: { userId, achievementId: achievement.id, source },
+    skipDuplicates: true,
+  });
+
+  if (created.count === 0) return false;
+
+  if (achievement.reward > 0) {
+    await tx.ledger.create({
+      data: {
+        userId,
+        amount: achievement.reward,
+        reason: "achievement",
+        note: `Achievement: ${achievement.name}`,
+      },
+    });
+    await tx.user.update({
+      where: { id: userId },
+      data: { renown: { increment: achievement.reward } },
+    });
+  }
+  return true;
+}
+
+/** Checks event-based automatic achievements inside the triggering transaction. */
+async function checkAutomaticAchievements(
+  tx: AchievementTx,
+  event: "quest_completed" | "store_purchase",
+  userIds: string[],
+  partySize = 0
+) {
+  if (userIds.length === 0) return;
+
+  const achievements = await tx.achievement.findMany({
+    where: {
+      assignType: "Automatic",
+      isActive: true,
+    },
+  });
+
+  for (const achievement of achievements) {
+    // Complete X quests.
+    if (
+      event === "quest_completed" &&
+      achievement.trigger === "completed_quests"
+    ) {
+      if (achievement.earnType !== "Individual") continue;
+
+      for (const userId of userIds) {
+        const completedCount = await tx.signup.count({
+          where: {
+            userId,
+            status: "completed",
+          },
+        });
+
+        if (completedCount >= Math.max(1, achievement.target)) {
+          await grantAchievement(
+            tx,
+            achievement,
+            userId,
+            "automatic"
+          );
+        }
+      }
+    }
+
+    // Complete a quest with X or more players.
+    if (
+      event === "quest_completed" &&
+      achievement.trigger === "completed_quest_party_size"
+    ) {
+      if (achievement.earnType !== "Team") continue;
+
+      if (partySize >= Math.max(1, achievement.target)) {
+        for (const userId of userIds) {
+          await grantAchievement(
+            tx,
+            achievement,
+            userId,
+            "automatic"
+          );
+        }
+      }
+    }
+
+    // Spend X Renown in the store.
+    if (
+      event === "store_purchase" &&
+      achievement.trigger === "renown_spent"
+    ) {
+      if (achievement.earnType !== "Individual") continue;
+
+      for (const userId of userIds) {
+        const spent = await tx.ledger.aggregate({
+          where: {
+            userId,
+            reason: "store_purchase",
+            amount: { lt: 0 },
+          },
+          _sum: {
+            amount: true,
+          },
+        });
+
+        if (
+          Math.abs(spent._sum.amount ?? 0) >=
+          Math.max(1, achievement.target)
+        ) {
+          await grantAchievement(
+            tx,
+            achievement,
+            userId,
+            "automatic"
+          );
+        }
+      }
+    }
+
+    // Buy X items.
+    if (
+      event === "store_purchase" &&
+      achievement.trigger === "items_purchased"
+    ) {
+      if (achievement.earnType !== "Individual") continue;
+
+      for (const userId of userIds) {
+        const purchasedCount = await tx.ownedItem.count({
+          where: {
+            userId,
+          },
+        });
+
+        if (
+          purchasedCount >= Math.max(1, achievement.target)
+        ) {
+          await grantAchievement(
+            tx,
+            achievement,
+            userId,
+            "automatic"
+          );
+        }
+      }
+    }
+  }
+}
+
 export async function completeQuest(fd: FormData): R {
   await requireAdmin();
 
@@ -1126,7 +1276,6 @@ export async function completeQuest(fd: FormData): R {
         await tx.ledger.create({
           data: {
             userId: su.userId,
-            questId,
             amount: r.amount,
             reason: r.reason,
           },
@@ -1157,6 +1306,14 @@ export async function completeQuest(fd: FormData): R {
       where: { id: questId },
       data: { status: "completed" },
     });
+
+    const partyUserIds = q.signups.map((su) => su.userId);
+    await checkAutomaticAchievements(
+      tx,
+      "quest_completed",
+      partyUserIds,
+      partyUserIds.length
+    );
 
     return "Quest completed and renown paid out.";
   });
@@ -1374,6 +1531,14 @@ export async function buyItem(fd: FormData): R {
         type: item.type,
       },
     });
+
+        // Check purchase achievements after successfully adding the item.
+    // This also counts items that cost 0 Renown.
+    await checkAutomaticAchievements(
+      tx,
+      "store_purchase",
+      [player.id]
+    );
 
     return `You bought "${item.name}" for ${item.price} Renown.`;
   });
@@ -1674,4 +1839,124 @@ export async function reactivatePlayer(
   });
 
   revalidatePath("/admin");
+}
+
+
+/* ---------- achievements ---------- */
+
+const ACHIEVEMENT_TRIGGERS = [
+  "completed_quests",
+  "renown_spent",
+  "completed_quest_party_size",
+  "items_purchased",
+] as const;
+
+function parseAchievementForm(fd: FormData) {
+  const name = s(fd, "name");
+  const assignType = s(fd, "assignType");
+  const earnType = s(fd, "earnType");
+  const trigger = s(fd, "trigger");
+  const target = Math.max(1, parseInt(s(fd, "target"), 10) || 1);
+  const reward = parseInt(s(fd, "reward"), 10);
+
+  if (!name) return "Enter an achievement name.";
+  if (!["Automatic", "Manual"].includes(assignType)) return "Choose a valid assignment type.";
+  if (!["Individual", "Team"].includes(earnType)) return "Choose a valid earning type.";
+  if (!Number.isInteger(reward) || reward < 0) return "Reward must be zero or greater.";
+  if (assignType === "Automatic" && !(ACHIEVEMENT_TRIGGERS as readonly string[]).includes(trigger)) {
+    return "Choose a valid automatic trigger.";
+  }
+  if (
+  assignType === "Automatic" &&
+  trigger === "completed_quest_party_size" &&
+  earnType !== "Team"
+) {
+  return "Party-size achievements must use Team earning type.";
+}
+
+if (
+  assignType === "Automatic" &&
+  trigger !== "completed_quest_party_size" &&
+  earnType !== "Individual"
+) {
+  return "This automatic trigger currently supports Individual achievements only.";
+}
+
+  return {
+    name, assignType, earnType,
+    secret: fd.get("secret") === "on",
+    description: s(fd, "description"),
+    reward,
+    trigger: assignType === "Automatic" ? trigger : null,
+    target,
+  };
+}
+
+export async function createAchievement(fd: FormData): R {
+  await requireAdmin();
+  const data = parseAchievementForm(fd);
+  if (typeof data === "string") return data;
+  if (await db.achievement.findUnique({ where: { name: data.name }, select: { id: true } })) {
+    return "An achievement with that name already exists.";
+  }
+  await db.achievement.create({ data });
+  return done("Achievement created.");
+}
+
+export async function updateAchievement(fd: FormData): R {
+  await requireAdmin();
+  const id = s(fd, "achievementId");
+  if (!id) return "Missing achievement ID.";
+  const data = parseAchievementForm(fd);
+  if (typeof data === "string") return data;
+  const duplicate = await db.achievement.findFirst({
+    where: { name: data.name, NOT: { id } }, select: { id: true },
+  });
+  if (duplicate) return "Another achievement already uses that name.";
+  await db.achievement.update({ where: { id }, data });
+  return done("Achievement updated.");
+}
+
+export async function toggleAchievement(fd: FormData): R {
+  await requireAdmin();
+  const id = s(fd, "achievementId");
+  const isActive = s(fd, "isActive") === "true";
+  if (!id) return "Missing achievement ID.";
+  await db.achievement.update({ where: { id }, data: { isActive } });
+  return done(isActive ? "Achievement enabled." : "Achievement disabled.");
+}
+
+export async function awardAchievementManually(fd: FormData): R {
+  await requireAdmin();
+  const achievementId = s(fd, "achievementId");
+  const userId = s(fd, "userId");
+  const questId = s(fd, "questId");
+  if (!achievementId) return "Choose an achievement.";
+
+  const result = await db.$transaction(async (tx) => {
+    const achievement = await tx.achievement.findUnique({ where: { id: achievementId } });
+    if (!achievement || !achievement.isActive) return "Achievement not found or disabled.";
+    if (achievement.assignType !== "Manual") return "Only manual achievements can be awarded manually.";
+
+    let userIds: string[] = [];
+    if (achievement.earnType === "Team") {
+      if (!questId) return "Choose a quest for this team achievement.";
+      const signups = await tx.signup.findMany({
+        where: { questId, status: { in: ["signed_up", "completed"] } },
+        select: { userId: true },
+      });
+      userIds = signups.map((x) => x.userId);
+      if (userIds.length === 0) return "That quest has no players to award.";
+    } else {
+      if (!userId) return "Choose a player.";
+      userIds = [userId];
+    }
+
+    let awarded = 0;
+    for (const id of [...new Set(userIds)]) {
+      if (await grantAchievement(tx, achievement, id, "manual")) awarded++;
+    }
+    return awarded === 0 ? "Those players already have this achievement." : `Achievement awarded to ${awarded} player(s).`;
+  });
+  return done(result);
 }

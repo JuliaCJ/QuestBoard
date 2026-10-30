@@ -219,7 +219,7 @@ function renderPlayerList(list: typeof players) {
       </article>
 
       <article className="panel">
-        <h2>Priority keys</h2>
+        <h2>Priority Keys</h2>
 
         <ActionForm action={A.createKey} className="inline">
           <input

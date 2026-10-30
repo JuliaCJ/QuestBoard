@@ -119,6 +119,18 @@ export default async function QuestPortalDetails({
   const rostered = new Set(roster.map((s) => s.userId));
   const availablePlayers = players.filter((p) => !rostered.has(p.id));
 
+  const teamAchievements =
+    isAdmin && !isPast && q.status === "active"
+      ? await db.achievement.findMany({
+          where: {
+            isActive: true,
+            assignType: "Manual",
+            earnType: "Team",
+          },
+          orderBy: { name: "asc" },
+        })
+      : [];
+
   const picker = (
     <label>
       Class
@@ -173,6 +185,7 @@ export default async function QuestPortalDetails({
             {(isDraft || q.postAt > now || q.status === "postponed") && (
               <ActionForm action={A.postNow} className="inline">
                 <input type="hidden" name="questId" value={q.id} />
+
                 {isDraft ? (
                   <span>
                     This quest is a draft and is not visible to players.
@@ -184,6 +197,7 @@ export default async function QuestPortalDetails({
                     Publish this quest and reopen priority access.
                   </span>
                 )}
+
                 <button type="submit">Post now</button>
               </ActionForm>
             )}
@@ -438,38 +452,7 @@ export default async function QuestPortalDetails({
         )}
       </article>
 
-      {isAdmin && !isPast && q.status === "active" && (
-        <article className="panel">
-          <ActionForm action={A.completeQuest} className="stack">
-            <input type="hidden" name="questId" value={q.id} />
-
-            <h2>Complete Quest</h2>
-
-            {roster.length === 0 && <p>No one is signed up.</p>}
-
-            {roster.map((s) => (
-              <div className="row" key={s.id}>
-                <span>
-                  {s.user?.displayName ?? "Unknown or deleted player"},{" "}
-                  {s.className}
-                </span>
-
-                <input
-                  name={`bonus_${s.userId}`}
-                  type="number"
-                  min={0}
-                  placeholder="Bonus Renown"
-                  style={{ width: "9rem" }}
-                />
-              </div>
-            ))}
-
-            <button type="submit">Complete and Pay Out Renown</button>
-          </ActionForm>
-        </article>
-      )}
-
-      {isAdmin && !isPast && (
+{u.role === "admin" && !isPast && (
         <article className="panel">
           <h2>Roster Management</h2>
 
@@ -537,6 +520,7 @@ export default async function QuestPortalDetails({
               <option value="" disabled>
                 Select a player
               </option>
+
               {availablePlayers.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.displayName}
@@ -557,6 +541,93 @@ export default async function QuestPortalDetails({
             </select>
 
             <button type="submit">Add</button>
+          </ActionForm>
+        </article>
+      )}
+
+      {/* Team Achievements */}
+      {isAdmin && !isPast && q.status === "active" && (
+        <article className="panel">
+          <h2>Team Achievements</h2>
+
+          <p>
+            Award an achievement to everyone currently signed up for this
+            quest. Each player will receive the achievement and its Renown
+            reward.
+          </p>
+
+          {teamAchievements.length === 0 ? (
+            <p className="note">
+              No active manual team achievements are available.
+            </p>
+          ) : (
+            <ActionForm
+              action={A.awardAchievementManually}
+              className="stack"
+            >
+              <input type="hidden" name="questId" value={q.id} />
+
+              <label>
+                Select Team Achievement
+                <select
+                  name="achievementId"
+                  defaultValue=""
+                  required
+                >
+                  <option value="" disabled>
+                    Choose an achievement
+                  </option>
+
+                  {teamAchievements.map((achievement) => (
+                    <option
+                      key={achievement.id}
+                      value={achievement.id}
+                    >
+                      {achievement.name} — {achievement.reward} Renown
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button type="submit">
+                Award to Entire Party
+              </button>
+            </ActionForm>
+          )}
+        </article>
+      )}
+
+
+            {/* Complete Quest */}
+      {isAdmin && !isPast && q.status === "active" && (
+        <article className="panel">
+          <ActionForm action={A.completeQuest} className="stack">
+            <input type="hidden" name="questId" value={q.id} />
+
+            <h2>Complete Quest</h2>
+
+            {roster.length === 0 && <p>No one is signed up.</p>}
+
+            {roster.map((s) => (
+              <div className="row" key={s.id}>
+                <span>
+                  {s.user?.displayName ?? "Unknown or deleted player"},{" "}
+                  {s.className}
+                </span>
+
+                <input
+                  name={`bonus_${s.userId}`}
+                  type="number"
+                  min={0}
+                  placeholder="Bonus Renown"
+                  style={{ width: "9rem" }}
+                />
+              </div>
+            ))}
+
+            <button type="submit">
+              Complete and Pay Out Renown
+            </button>
           </ActionForm>
         </article>
       )}

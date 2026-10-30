@@ -9,20 +9,21 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  username      String        @unique
-  passwordHash  String
-  role          String        @default("player") // admin | player
-  displayName   String
-  hasPriority   Boolean       @default(false)
-  priorityUntil DateTime? // set when a priority key is redeemed
-  renown        Int           @default(0) // cached sum of Ledger
-  isActive      Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  ownedItems    OwnedItem[]
-  signups       Signup[]
-  ledger        Ledger[]
-  keys          PriorityKey[]
+  id                String           @id @default(cuid())
+  username          String           @unique
+  passwordHash      String
+  role              String           @default("player")
+  displayName       String
+  hasPriority       Boolean          @default(false)
+  priorityUntil     DateTime?
+  renown            Int              @default(0)
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  ownedItems        OwnedItem[]
+  signups           Signup[]
+  ledger            Ledger[]
+  keys              PriorityKey[]
+  achievements      UserAchievement[]
 }
 
 model Quest {
@@ -70,10 +71,10 @@ model Ledger {
   id        String   @id @default(cuid())
   userId    String
   amount    Int
-  reason    String // quest | bonus | first_quest | admin_adjust | (later: purchase, achievement)
+  reason    String // quest | bonus | first_quest | admin_adjust | store_purchase | achievement
   note      String?
-  questId   String?
   createdAt DateTime @default(now())
+
   user      User     @relation(fields: [userId], references: [id])
 }
 
@@ -129,5 +130,42 @@ model OwnedItem {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+model Achievement {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  assignType      String            @default("Manual") // Automatic | Manual
+  earnType        String            @default("Individual") // Individual | Team
+  secret          Boolean           @default(false)
+  description     String            @default("")
+  reward          Int               @default(0)
+
+  // Used by automatic achievements
+  // completed_quests | renown_spent | completed_quest_party_size
+  trigger         String?
+  target          Int               @default(1)
+
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  recipients      UserAchievement[]
+}
+
+model UserAchievement {
+  id              String      @id @default(cuid())
+  userId          String
+  achievementId   String
+  earnedAt        DateTime    @default(now())
+  source          String      @default("automatic") // automatic | manual
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement     Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  // Prevents a player from receiving the same achievement more than once
+  @@unique([userId, achievementId])
+  @@index([achievementId])
   @@index([userId])
 }

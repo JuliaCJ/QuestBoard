@@ -1,11 +1,12 @@
-export default {
+const nextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }] }];
   },
-};
-
-const nextConfig = {
   experimental: {
-    serverActions: { bodySizeLimit: "3mb" },
+    serverActions: {
+      bodySizeLimit: "8mb",
+    },
   },
 };
+
+export default nextConfig;

@@ -1859,31 +1859,49 @@ function parseAchievementForm(fd: FormData) {
   const target = Math.max(1, parseInt(s(fd, "target"), 10) || 1);
   const reward = parseInt(s(fd, "reward"), 10);
 
-  if (!name) return "Enter an achievement name.";
-  if (!["Automatic", "Manual"].includes(assignType)) return "Choose a valid assignment type.";
-  if (!["Individual", "Team"].includes(earnType)) return "Choose a valid earning type.";
-  if (!Number.isInteger(reward) || reward < 0) return "Reward must be zero or greater.";
-  if (assignType === "Automatic" && !(ACHIEVEMENT_TRIGGERS as readonly string[]).includes(trigger)) {
+  if (!name) {
+    return "Enter an achievement name.";
+  }
+
+  if (!["Automatic", "Manual"].includes(assignType)) {
+    return "Choose a valid assignment type.";
+  }
+
+  if (!["Individual", "Team"].includes(earnType)) {
+    return "Choose a valid earning type.";
+  }
+
+  if (!Number.isInteger(reward) || reward < 0) {
+    return "Reward must be zero or greater.";
+  }
+
+  if (
+    assignType === "Automatic" &&
+    !(ACHIEVEMENT_TRIGGERS as readonly string[]).includes(trigger)
+  ) {
     return "Choose a valid automatic trigger.";
   }
-  if (
-  assignType === "Automatic" &&
-  trigger === "completed_quest_party_size" &&
-  earnType !== "Team"
-) {
-  return "Party-size achievements must use Team earning type.";
-}
 
-if (
-  assignType === "Automatic" &&
-  trigger !== "completed_quest_party_size" &&
-  earnType !== "Individual"
-) {
-  return "This automatic trigger currently supports Individual achievements only.";
-}
+  if (
+    assignType === "Automatic" &&
+    trigger === "completed_quest_party_size" &&
+    earnType !== "Team"
+  ) {
+    return "Party-size achievements must use Team earning type.";
+  }
+
+  if (
+    assignType === "Automatic" &&
+    trigger !== "completed_quest_party_size" &&
+    earnType !== "Individual"
+  ) {
+    return "This automatic trigger currently supports Individual achievements only.";
+  }
 
   return {
-    name, assignType, earnType,
+    name,
+    assignType,
+    earnType,
     secret: fd.get("secret") === "on",
     description: s(fd, "description"),
     reward,
@@ -1926,37 +1944,96 @@ export async function toggleAchievement(fd: FormData): R {
   return done(isActive ? "Achievement enabled." : "Achievement disabled.");
 }
 
+
 export async function awardAchievementManually(fd: FormData): R {
   await requireAdmin();
+
   const achievementId = s(fd, "achievementId");
   const userId = s(fd, "userId");
   const questId = s(fd, "questId");
-  if (!achievementId) return "Choose an achievement.";
+
+  if (!achievementId) return done("Choose an achievement.");
 
   const result = await db.$transaction(async (tx) => {
-    const achievement = await tx.achievement.findUnique({ where: { id: achievementId } });
-    if (!achievement || !achievement.isActive) return "Achievement not found or disabled.";
-    if (achievement.assignType !== "Manual") return "Only manual achievements can be awarded manually.";
+    const achievement = await tx.achievement.findUnique({
+      where: { id: achievementId },
+    });
+
+    if (!achievement || !achievement.isActive) {
+      return "Achievement not found or disabled.";
+    }
 
     let userIds: string[] = [];
+
     if (achievement.earnType === "Team") {
-      if (!questId) return "Choose a quest for this team achievement.";
+      if (!questId) {
+        return "Choose a quest for this team achievement.";
+      }
+
       const signups = await tx.signup.findMany({
-        where: { questId, status: { in: ["signed_up", "completed"] } },
+        where: {
+          questId,
+          status: { in: ["signed_up", "completed"] },
+        },
         select: { userId: true },
       });
+
       userIds = signups.map((x) => x.userId);
-      if (userIds.length === 0) return "That quest has no players to award.";
+
+      if (userIds.length === 0) {
+        return "That quest has no players to award.";
+      }
     } else {
-      if (!userId) return "Choose a player.";
+      if (!userId) {
+        return "Choose a player.";
+      }
+
       userIds = [userId];
     }
 
     let awarded = 0;
+
     for (const id of [...new Set(userIds)]) {
-      if (await grantAchievement(tx, achievement, id, "manual")) awarded++;
+      if (await grantAchievement(tx, achievement, id, "manual")) {
+        awarded++;
+      }
     }
-    return awarded === 0 ? "Those players already have this achievement." : `Achievement awarded to ${awarded} player(s).`;
+
+    return awarded === 0
+      ? "Those players already have this achievement."
+      : `Achievement awarded to ${awarded} player(s).`;
   });
+
   return done(result);
 }
+
+
+
+export async function deleteAchievement(fd: FormData): R {
+  await requireAdmin();
+
+  const achievementId = s(fd, "achievementId");
+
+  if (!achievementId) {
+    return done("Choose an achievement to delete.");
+  }
+
+  const result = await db.$transaction(async (tx) => {
+    const achievement = await tx.achievement.findUnique({
+      where: { id: achievementId },
+    });
+
+    if (!achievement) {
+      return "Achievement not found.";
+    }
+
+    await tx.achievement.delete({
+      where: { id: achievementId },
+    });
+
+    return `Achievement "${achievement.name}" deleted.`;
+  });
+
+  return done(result);
+}
+

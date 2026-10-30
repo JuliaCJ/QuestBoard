@@ -3,10 +3,19 @@ import { jwtVerify } from "jose";
 
 export async function proxy(req: NextRequest) {
   try {
-    await jwtVerify(req.cookies.get("qb_session")?.value ?? "", new TextEncoder().encode(process.env.AUTH_SECRET!));
+    await jwtVerify(
+      req.cookies.get("qb_session")?.value ?? "",
+      new TextEncoder().encode(process.env.AUTH_SECRET!)
+    );
+
     return NextResponse.next();
   } catch {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }
-export const config = { matcher: ["/((?!login|api/cron|robots.txt|_next|favicon.ico).*)"] };
+
+export const config = {
+  matcher: [
+    "/((?!login|api|robots.txt|_next|favicon.ico).*)",
+  ],
+};

@@ -109,6 +109,16 @@ model ItemImage {
   createdAt DateTime @default(now())
 }
 
+
+model AchievementImage {
+  id        String   @id @default(cuid())
+  key       String   @unique // common | uncommon | rare | platinum | secret | locked
+  mime      String
+  data      Bytes
+  updatedAt DateTime @updatedAt
+}
+
+
 model ItemLink {
   id        String   @id @default(cuid())
   itemId    String

@@ -1405,7 +1405,7 @@ async function readImage(
   }
 
   if (f.size > MAX_IMAGE_BYTES) {
-    return "The image must be 2 MB or smaller.";
+    return "The image must be 5 MB or smaller.";
   }
 
   const data = Buffer.from(await f.arrayBuffer());
@@ -1425,7 +1425,7 @@ function parseItem(fd: FormData) {
   const type = s(fd, "type");
   const labelId = s(fd, "labelId");
 
-  if (!name) return "Enter an item name.";
+  if (!name) return "Enter an Item Name.";
 
   if (name.length > 100) {
     return "Item name must be 100 characters or fewer.";
@@ -1440,11 +1440,11 @@ function parseItem(fd: FormData) {
   }
 
   if (!(ITEM_TYPES as readonly string[]).includes(type)) {
-    return "Pick an item type.";
+    return "Pick an Item Type.";
   }
 
   if (!labelId) {
-    return "Choose a label for this item.";
+    return "Choose a Label for this item.";
   }
 
   return {
@@ -1463,7 +1463,7 @@ export async function buyItem(fd: FormData): R {
   const itemId = s(fd, "itemId");
 
   if (!itemId) {
-    return "Missing item ID.";
+    return "Missing Item ID.";
   }
 
   if (u.role !== "player") {

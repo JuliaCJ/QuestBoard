@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -122,6 +121,17 @@ export default async function AchievementsPage() {
     );
   }
 
+  function renderTypeDivider() {
+    return (
+      <div
+        style={{
+          borderTop: "1px solid #0002",
+          marginTop: "1.25rem",
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <article className="panel">
@@ -156,28 +166,32 @@ export default async function AchievementsPage() {
 
         {uncommon.length > 0 && (
           <>
-            <h3 style={{ marginTop: "1.5rem" }}>Uncommon</h3>
+            {renderTypeDivider()}
+            <h3 style={{ marginTop: ".75rem" }}>Uncommon</h3>
             {renderAchievements(uncommon, true)}
           </>
         )}
 
         {rare.length > 0 && (
           <>
-            <h3 style={{ marginTop: "1.5rem" }}>Rare</h3>
+            {renderTypeDivider()}
+            <h3 style={{ marginTop: ".75rem" }}>Rare</h3>
             {renderAchievements(rare, true)}
           </>
         )}
 
         {platinum.length > 0 && (
           <>
-            <h3 style={{ marginTop: "1.5rem" }}>Platinum</h3>
+            {renderTypeDivider()}
+            <h3 style={{ marginTop: ".75rem" }}>Platinum</h3>
             {renderAchievements(platinum, true)}
           </>
         )}
 
         {earnedSecret.length > 0 && (
           <>
-            <h3 style={{ marginTop: "1.5rem" }}>Secret</h3>
+            {renderTypeDivider()}
+            <h3 style={{ marginTop: ".75rem" }}>Secret</h3>
             {renderAchievements(earnedSecret, true, true)}
           </>
         )}
@@ -204,7 +218,8 @@ export default async function AchievementsPage() {
 
         {availableSecret.length > 0 && (
           <>
-            <h3 style={{ marginTop: "1.5rem" }}>Secret</h3>
+            {available.length > 0 && renderTypeDivider()}
+            <h3 style={{ marginTop: ".75rem" }}>Secret</h3>
             {renderAchievements(availableSecret, false, true)}
           </>
         )}

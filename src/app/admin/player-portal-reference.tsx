@@ -85,7 +85,7 @@ function renderPlayerList(list: typeof players) {
           {" · "}{p.renown} Renown
           {priority ? " · Priority" : ""}
           {p.priorityUntil && !p.hasPriority
-            ? ` until ${fmt(p.priorityUntil)}`
+            ? ` Until ${fmt(p.priorityUntil)}`
             : ""}
         </div>
 

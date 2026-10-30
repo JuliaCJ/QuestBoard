@@ -1,11 +1,11 @@
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ActionForm from "@/components/ActionForm";
 import * as A from "@/app/actions";
 
 type AchievementData = {
+  isActive: import("react").JSX.Element;
   id: string;
   name: string;
   assignType: string;
@@ -22,9 +22,27 @@ export function AchievementFields({
 }: {
   achievement?: AchievementData;
 }) {
+  const assignmentSelectRef = useRef<HTMLSelectElement>(null);
+
   const [assignType, setAssignType] = useState(
     achievement?.assignType ?? "Manual"
   );
+
+  useEffect(() => {
+    const form = assignmentSelectRef.current?.form;
+
+    if (!form) return;
+
+    const handleReset = () => {
+      setAssignType(achievement?.assignType ?? "Manual");
+    };
+
+    form.addEventListener("reset", handleReset);
+
+    return () => {
+      form.removeEventListener("reset", handleReset);
+    };
+  }, [achievement?.assignType]);
 
   return (
     <>
@@ -40,6 +58,7 @@ export function AchievementFields({
       <label>
         Assignment Type
         <select
+          ref={assignmentSelectRef}
           name="assignType"
           value={assignType}
           onChange={(e) => setAssignType(e.target.value)}
@@ -81,7 +100,7 @@ export function AchievementFields({
       </label>
 
       <label className="checkbox-label">
-        Secret achievement
+        Secret Achievement
         <input
           name="secret"
           type="checkbox"

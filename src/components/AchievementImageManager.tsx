@@ -39,17 +39,17 @@ export default function AchievementImageManager({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Upload failed.");
+        throw new Error(result.error || "Upload Failed.");
       }
 
       setImages((current) =>
         current.includes(key) ? current : [...current, key]
       );
 
-      setMessage(`${key} image uploaded successfully.`);
+      setMessage(`${key} Image Uploaded Successfully.`);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Upload failed."
+        error instanceof Error ? error.message : "Upload Failed."
       );
     } finally {
       setBusy(null);
@@ -74,7 +74,7 @@ export default function AchievementImageManager({
       }
 
       setImages((current) => current.filter((x) => x !== key));
-      setMessage(`${key} image removed.`);
+      setMessage(`${key} Image Removed.`);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Removal failed."
@@ -110,7 +110,7 @@ export default function AchievementImageManager({
             <strong>{label}</strong>
             <br />
             <small>
-              {images.includes(key) ? "Image uploaded" : "No image"}
+              {images.includes(key) ? "Image Uploaded" : "No image"}
             </small>
           </div>
 
@@ -148,7 +148,7 @@ export default function AchievementImageManager({
     }}
   >
     <label style={{ margin: 0 }}>
-  Upload {label} image
+  Upload {label} Image
 </label>
 
     <input

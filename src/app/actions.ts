@@ -73,7 +73,7 @@ export async function login(fd: FormData): R {
       t: live?.t ?? now,
     });
 
-    return "Wrong username or password.";
+    return "Wrong Username or Password.";
   }
 
   attempts.delete(username);

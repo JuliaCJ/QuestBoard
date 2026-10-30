@@ -27,10 +27,6 @@ export default async function AchievementsPage() {
   const achievements = await db.achievement.findMany({
     where: {
       isActive: true,
-      OR: [
-        { secret: false },
-        { recipients: { some: { userId: user.id } } },
-      ],
     },
     include: {
       recipients: {
@@ -41,101 +37,52 @@ export default async function AchievementsPage() {
     orderBy: [{ secret: "asc" }, { name: "asc" }],
   });
 
-  const earned = achievements.filter((a) => a.recipients.length > 0);
-  const available = achievements.filter((a) => a.recipients.length === 0);
+  const earned = achievements.filter(
+    (a) => a.recipients.length > 0 && !a.secret
+  );
 
-  return (
-    <>
-      <article className="panel">
-        <h1>Achievements</h1>
-        <p>
-          {earned.length} of {achievements.length} achievements earned.
-        </p>
-        <p>
-          <Link href="/account">Back to Account</Link>
-        </p>
-      </article>
+  const earnedSecret = achievements.filter(
+    (a) => a.recipients.length > 0 && a.secret
+  );
 
-      {/* Earned Achievements */}
-      <article className="panel">
-        <h2>Earned ({earned.length})</h2>
+  const available = achievements.filter(
+    (a) => a.recipients.length === 0 && !a.secret
+  );
 
-        {earned.length === 0 && (
-          <p>
-            You have not earned any achievements yet. Complete quests and
-            explore the QuestBoard!
-          </p>
-        )}
+  const availableSecret = achievements.filter(
+    (a) => a.recipients.length === 0 && a.secret
+  );
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-            gap: "1.25rem",
-            marginTop: "1rem",
-          }}
-        >
-          {earned.map((a) => {
-            const image = getAchievementImage(a, true);
+  const common = earned.filter((a) => a.reward <= 400);
+  const uncommon = earned.filter(
+    (a) => a.reward > 400 && a.reward <= 700
+  );
+  const rare = earned.filter(
+    (a) => a.reward > 700 && a.reward < 1000
+  );
+  const platinum = earned.filter((a) => a.reward >= 1000);
 
-            return (
-              <div
-                key={a.id}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  textAlign: "center",
-                  gap: ".35rem",
-                  minWidth: 0,
-                  padding: ".5rem",
-                }}
-              >
-                <img
-                  src={`/api/achievement-images/${image}`}
-                  alt={`${image} achievement`}
-                  style={{
-                    width: "72px",
-                    height: "72px",
-                    objectFit: "contain",
-                    flexShrink: 0,
-                  }}
-                />
+  const totalEarned = earned.length + earnedSecret.length;
+  const totalAchievements = achievements.length;
 
-                <strong>{a.name}</strong>
+  function renderAchievements(
+    items: typeof achievements,
+    isEarned: boolean,
+    isSecret = false
+  ) {
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gap: "1.25rem",
+          marginTop: "1rem",
+        }}
+      >
+        {items.map((a) => {
+          const image = getAchievementImage(a, isEarned);
 
-                <span style={{ fontSize: ".9rem" }}>
-                  {a.description}
-                </span>
-
-        
-
-                
-              </div>
-            );
-          })}
-        </div>
-      </article>
-
-      {/* Unearned Achievements */}
-      <article className="panel">
-        <h2>Not Yet Earned ({available.length})</h2>
-
-        {available.length === 0 && (
-          <p>
-            You have earned every achievement currently available to you!
-          </p>
-        )}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-            gap: "1.25rem",
-            marginTop: "1rem",
-          }}
-        >
-          {available.map((a) => (
+          return (
             <div
               key={a.id}
               style={{
@@ -149,8 +96,8 @@ export default async function AchievementsPage() {
               }}
             >
               <img
-                src="/api/achievement-images/locked"
-                alt="Locked achievement"
+                src={`/api/achievement-images/${image}`}
+                alt={`${image} achievement`}
                 style={{
                   width: "72px",
                   height: "72px",
@@ -159,15 +106,108 @@ export default async function AchievementsPage() {
                 }}
               />
 
-              <strong>{a.name}</strong>
+              <strong>
+                {isSecret && !isEarned ? "?????" : a.name}
+              </strong>
 
-              <span style={{ fontSize: ".9rem" }}>
-                {a.description}
-              </span>
-
+              {!(isSecret && !isEarned) && (
+                <span style={{ fontSize: ".9rem" }}>
+                  {a.description}
+                </span>
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <article className="panel">
+        <h1>Achievements</h1>
+
+        <p>
+          {totalEarned} of {totalAchievements} achievements earned.
+        </p>
+
+        <p>
+          <Link href="/account">Back to Account</Link>
+        </p>
+      </article>
+
+      {/* Earned Achievements */}
+      <article className="panel">
+        <h2>Earned ({totalEarned})</h2>
+
+        {totalEarned === 0 && (
+          <p>
+            You have not earned any achievements yet. Complete quests and
+            explore the QuestBoard!
+          </p>
+        )}
+
+        {common.length > 0 && (
+          <>
+            <h3>Common</h3>
+            {renderAchievements(common, true)}
+          </>
+        )}
+
+        {uncommon.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.5rem" }}>Uncommon</h3>
+            {renderAchievements(uncommon, true)}
+          </>
+        )}
+
+        {rare.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.5rem" }}>Rare</h3>
+            {renderAchievements(rare, true)}
+          </>
+        )}
+
+        {platinum.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.5rem" }}>Platinum</h3>
+            {renderAchievements(platinum, true)}
+          </>
+        )}
+
+        {earnedSecret.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.5rem" }}>Secret</h3>
+            {renderAchievements(earnedSecret, true, true)}
+          </>
+        )}
+      </article>
+
+      {/* Unearned Achievements */}
+      <article className="panel">
+        <h2>
+          Not Yet Earned ({available.length + availableSecret.length})
+        </h2>
+
+        {available.length === 0 && availableSecret.length === 0 && (
+          <p>
+            You have earned every achievement currently available to you!
+          </p>
+        )}
+
+        {available.length > 0 && (
+          <>
+            <h3>Achievements</h3>
+            {renderAchievements(available, false)}
+          </>
+        )}
+
+        {availableSecret.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.5rem" }}>Secret</h3>
+            {renderAchievements(availableSecret, false, true)}
+          </>
+        )}
       </article>
     </>
   );

@@ -77,9 +77,13 @@ db.user.findMany({
     (q) => q.status === "cancelled" || q.status === "completed"
   );
 
-  const activePlayers = players.filter((p) => p.isActive);
-  const inactivePlayers = players.filter((p) => !p.isActive);
+  const activePlayers = players
+  .filter((p) => p.isActive)
+  .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
+const inactivePlayers = players
+  .filter((p) => !p.isActive)
+  .sort((a, b) => a.displayName.localeCompare(b.displayName));
   const now = new Date();
 
   

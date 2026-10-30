@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -6,12 +7,26 @@ import PlayerEditor from "@/components/PlayerEditor";
 import PlayerPriorityControls from "@/components/PlayerPriorityControls";
 import * as A from "@/app/actions";
 
+type PlayerAchievement = {
+  id: string;
+  achievement: {
+    name: string;
+    reward: number;
+  };
+};
+
 export default function PlayerActionsRow({
   userId,
   hasPriority,
+  displayName,
+  username,
+  achievements,
 }: {
   userId: string;
   hasPriority: boolean;
+  displayName: string;
+  username: string;
+  achievements: PlayerAchievement[];
 }) {
   const [resetMsg, setResetMsg] = useState("");
 
@@ -26,7 +41,12 @@ export default function PlayerActionsRow({
           flexWrap: "wrap",
         }}
       >
-        <PlayerEditor userId={userId} />
+        <PlayerEditor
+          userId={userId}
+          displayName={displayName}
+          username={username}
+          achievements={achievements}
+        />
 
         <PlayerPriorityControls
           userId={userId}

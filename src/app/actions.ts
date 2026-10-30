@@ -407,6 +407,160 @@ export async function resetPassword(fd: FormData): R {
 }
 
 
+export async function updatePlayerDetails(fd: FormData): R {
+  await requireAdmin();
+
+  const userId = s(fd, "userId");
+  const displayName = s(fd, "displayName");
+  const username = s(fd, "username").toLowerCase();
+
+  if (!userId) return "Missing player ID.";
+
+  if (!displayName || displayName.length > 60) {
+    return "Display name must contain 1-60 characters.";
+  }
+
+  if (!USERNAME_RE.test(username)) {
+    return "Username must be 3-24 characters: letters, numbers, dot, dash or underscore.";
+  }
+
+  const player = await db.user.findFirst({
+    where: {
+      id: userId,
+      role: "player",
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!player) return "Player not found.";
+
+  const duplicate = await db.user.findFirst({
+    where: {
+      username,
+      id: { not: userId },
+    },
+    select: { id: true },
+  });
+
+  if (duplicate) {
+    return "That username is already taken.";
+  }
+
+  try {
+    const result = await db.user.updateMany({
+      where: {
+        id: userId,
+        role: "player",
+      },
+      data: {
+        displayName,
+        username,
+      },
+    });
+
+    if (!result.count) return "Player not found.";
+
+  } catch {
+    return "That username is already taken.";
+  }
+
+  return done("Player information updated.");
+}
+
+
+export async function removePlayerAchievement(fd: FormData): R {
+  await requireAdmin();
+
+  const userId = s(fd, "userId");
+  const userAchievementId = s(fd, "userAchievementId");
+
+  if (!userId || !userAchievementId) {
+    return "Missing player or achievement ID.";
+  }
+
+  const result = await db.$transaction(async (tx) => {
+
+    // Lock the player's balance against concurrent Renown changes.
+    await tx.$queryRaw`
+      SELECT id FROM "User"
+      WHERE id = ${userId}
+      FOR UPDATE
+    `;
+
+    const player = await tx.user.findFirst({
+      where: {
+        id: userId,
+        role: "player",
+      },
+      select: {
+        id: true,
+        renown: true,
+      },
+    });
+
+    if (!player) return "Player not found.";
+
+    const earned = await tx.userAchievement.findFirst({
+      where: {
+        id: userAchievementId,
+        userId: player.id,
+      },
+      include: {
+        achievement: true,
+      },
+    });
+
+    if (!earned) {
+      return "This achievement is no longer assigned to the player.";
+    }
+
+    const reward = earned.achievement.reward;
+
+    if (player.renown < reward) {
+      return `Cannot remove this achievement. The player has ${player.renown} Renown but needs ${reward} to reverse the achievement reward.`;
+    }
+
+    // Remove the earned achievement.
+    await tx.userAchievement.delete({
+      where: {
+        id: earned.id,
+      },
+    });
+
+    // Reverse the original achievement payout.
+    if (reward > 0) {
+      await tx.user.update({
+        where: {
+          id: player.id,
+        },
+        data: {
+          renown: {
+            decrement: reward,
+          },
+        },
+      });
+
+      // Preserve the Renown transaction history.
+      await tx.ledger.create({
+        data: {
+          userId: player.id,
+          amount: -reward,
+          reason: "achievement",
+          note: `Removed achievement: ${earned.achievement.name}`,
+        },
+      });
+    }
+
+    return `Removed "${earned.achievement.name}" and deducted ${reward} Renown.`;
+  });
+
+  return done(result);
+}
+
+
+
 export async function setPriority(fd: FormData) {
   await requireAdmin();
 

@@ -33,10 +33,36 @@ export default async function Admin() {
       },
     }),
 
-    db.user.findMany({
-      where: { role: "player" },
-      orderBy: [{ isActive: "desc" }, { displayName: "asc" }],
-    }),
+    
+db.user.findMany({
+  where: {
+    role: "player",
+  },
+  orderBy: [
+    {
+      isActive: "desc",
+    },
+    {
+      displayName: "asc",
+    },
+  ],
+  include: {
+    achievements: {
+      include: {
+        achievement: {
+          select: {
+            name: true,
+            reward: true,
+          },
+        },
+      },
+      orderBy: {
+        earnedAt: "desc",
+      },
+    },
+  },
+}),
+
 
     db.priorityKey.findMany({
       orderBy: { expiresAt: "asc" },
@@ -102,9 +128,12 @@ function renderPlayerList(list: typeof players) {
           {p.isActive ? (
   
   <PlayerActionsRow
-    userId={p.id}
-    hasPriority={priority}
-  />
+  userId={p.id}
+  hasPriority={priority}
+  displayName={p.displayName}
+  username={p.username}
+  achievements={p.achievements}
+/>
 
           ) : (
             <>

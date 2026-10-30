@@ -97,7 +97,7 @@ function LabelSelect({
   return (
     <select name="labelId" defaultValue={defaultValue ?? ""} required>
       <option value="" disabled>
-        Choose a label…
+        Choose a Label…
       </option>
 
       {labels.map((l) => (
@@ -565,7 +565,7 @@ function AdminStore({
           )}
 
           <label>
-            Image (optional; PNG, JPEG, WebP or GIF, up to 2 MB)
+            Image (Optional; PNG, JPEG, WebP or GIF, up to 2 MB)
             <input
               name="image"
               type="file"
@@ -575,7 +575,7 @@ function AdminStore({
 
           <div className="grid2">
             <label>
-              Source Link Label (optional)
+              Source Link Label (Optional)
               <input
                 name="linkLabel"
                 placeholder="e.g. D&D Beyond"
@@ -584,7 +584,7 @@ function AdminStore({
             </label>
 
             <label>
-              Source Link Address (optional)
+              Source Link Address (Optional)
               <input name="linkUrl" placeholder="https://..." />
             </label>
           </div>
